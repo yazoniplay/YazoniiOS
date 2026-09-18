@@ -4,16 +4,22 @@ import asyncio
 from datetime import datetime, timezone
 
 import aiohttp
+import aiosqlite
 import discord
+
 from discord.ext import commands, tasks
 
 
 TOKEN = os.getenv("DISCORD_TOKEN")
-CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID", "0"))
+CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID"))
+
+
+DATABASE = "opportunities.db"
 
 
 intents = discord.Intents.default()
 intents.message_content = True
+
 
 bot = commands.Bot(
     command_prefix="!",
@@ -21,291 +27,227 @@ bot = commands.Bot(
 )
 
 
-seen = set()
-
-
 PROBLEM_WORDS = [
-    "problem",
-    "issue",
-    "hate",
+    "i hate",
     "annoying",
     "frustrating",
-    "struggle",
-    "wish",
-    "need",
+    "problem",
+    "issue",
+    "broken",
+    "manual",
+    "takes too long",
+    "wish there was",
+    "need a tool",
     "looking for",
     "alternative",
-    "missing",
-    "broken",
-    "slow",
-    "expensive",
-    "manual",
-    "hard",
-    "difficult",
-    "takes too long",
-    "automate",
-    "tool",
-    "software",
-    "app"
+    "hard to",
+    "struggle"
 ]
 
 
 MONEY_WORDS = [
     "pay",
     "paid",
-    "customer",
     "business",
+    "customer",
     "company",
-    "revenue",
-    "cost",
-    "price",
-    "subscription"
+    "subscription",
+    "expensive"
 ]
 
 
-def analyze(title, text):
+async def setup_db():
 
-    content = (
-        title + " " + text
-    ).lower()
+    async with aiosqlite.connect(DATABASE) as db:
 
-    score = 0
+        await db.execute("""
+        CREATE TABLE IF NOT EXISTS opportunities(
+            id TEXT PRIMARY KEY,
+            title TEXT,
+            score INTEGER,
+            source TEXT,
+            date TEXT
+        )
+        """)
 
-    for word in PROBLEM_WORDS:
-        if word in content:
-            score += 1
+        await db.commit()
 
-    for word in MONEY_WORDS:
-        if word in content:
-            score += 2
-
-    if len(text) > 500:
-        score += 2
-
-    return min(score, 10)
 
 
 def clean(text):
 
-    text = re.sub(
+    return re.sub(
         r"\s+",
         " ",
         text
-    )
-
-    return text[:800]
+    ).strip()
 
 
-async def reddit_search(session):
 
-    subs = [
+def score_problem(title, body):
+
+    text = (
+        title + " " + body
+    ).lower()
+
+
+    score = 0
+
+
+    for word in PROBLEM_WORDS:
+
+        if word in text:
+            score += 2
+
+
+    for word in MONEY_WORDS:
+
+        if word in text:
+            score += 2
+
+
+    if len(body) > 500:
+        score += 1
+
+
+    return min(score,10)
+
+
+
+async def already_seen(post_id):
+
+    async with aiosqlite.connect(DATABASE) as db:
+
+        cur = await db.execute(
+            "SELECT id FROM opportunities WHERE id=?",
+            (post_id,)
+        )
+
+        result = await cur.fetchone()
+
+        return result is not None
+
+
+
+async def save(post):
+
+    async with aiosqlite.connect(DATABASE) as db:
+
+        await db.execute(
+            """
+            INSERT OR IGNORE INTO opportunities
+            VALUES(?,?,?,?,?)
+            """,
+            (
+                post["id"],
+                post["title"],
+                post["score"],
+                post["source"],
+                datetime.now(timezone.utc).isoformat()
+            )
+        )
+
+        await db.commit()
+
+
+
+async def reddit_scan():
+
+    found=[]
+
+
+    subs=[
         "Entrepreneur",
-        "SaaS",
         "smallbusiness",
+        "SaaS",
         "SideProject",
-        "startups",
-        "webdev"
+        "startups"
     ]
 
-    results = []
 
-    headers = {
-        "User-Agent": "OpportunityScoutBot"
+    headers={
+        "User-Agent":"OpportunityScoutV4"
     }
 
 
-    for sub in subs:
-
-        try:
-
-            url = (
-                f"https://www.reddit.com/r/{sub}/hot.json?limit=20"
-            )
-
-
-            async with session.get(
-                url,
-                headers=headers
-            ) as r:
-
-
-                if r.status != 200:
-                    continue
-
-
-                data = await r.json()
-
-
-                for item in data["data"]["children"]:
-
-                    post = item["data"]
-
-                    pid = post["id"]
-
-                    if pid in seen:
-                        continue
-
-
-                    seen.add(pid)
-
-
-                    score = analyze(
-                        post.get("title",""),
-                        post.get("selftext","")
-                    )
-
-
-                    if score >= 3:
-
-                        results.append({
-
-                            "title":
-                                post.get("title",""),
-
-                            "body":
-                                post.get("selftext",""),
-
-                            "score":
-                                score,
-
-                            "url":
-                                "https://reddit.com"
-                                +
-                                post.get("permalink",""),
-
-                            "source":
-                                "Reddit r/" + sub
-                        })
-
-
-        except Exception as e:
-            print(
-                "Reddit error:",
-                e
-            )
-
-
-    return results
-
-
-
-async def hackernews_search(session):
-
-    results = []
-
-    try:
-
-        url = (
-            "https://hn.algolia.com/api/v1/search?"
-            "query=problem%20software"
-        )
-
-
-        async with session.get(url) as r:
-
-            data = await r.json()
-
-
-            for hit in data["hits"][:20]:
-
-                title = hit.get(
-                    "title",
-                    ""
-                )
-
-
-                score = analyze(
-                    title,
-                    ""
-                )
-
-
-                if score >= 2:
-
-                    results.append({
-
-                        "title":
-                            title,
-
-                        "body":
-                            "Hacker News discussion",
-
-                        "score":
-                            score,
-
-                        "url":
-                            hit.get(
-                                "url",
-                                ""
-                            ),
-
-                        "source":
-                            "Hacker News"
-
-                    })
-
-
-    except Exception as e:
-
-        print(
-            "HN error:",
-            e
-        )
-
-
-    return results
-
-
-
-async def find_opportunities():
-
     async with aiohttp.ClientSession() as session:
 
-        results = []
+        for sub in subs:
 
-        results += await reddit_search(session)
-
-        results += await hackernews_search(session)
+            url=f"https://www.reddit.com/r/{sub}/new.json?limit=20"
 
 
-    results.sort(
-        key=lambda x:x["score"],
-        reverse=True
-    )
+            try:
+
+                async with session.get(
+                    url,
+                    headers=headers
+                ) as r:
 
 
-    return results[:10]
+                    data=await r.json()
+
+
+                    for item in data["data"]["children"]:
+
+                        post=item["data"]
+
+
+                        pid=post["id"]
+
+
+                        if await already_seen(pid):
+                            continue
+
+
+                        title=post.get("title","")
+                        body=post.get("selftext","")
+
+
+                        score=score_problem(
+                            title,
+                            body
+                        )
+
+
+                        if score >= 6:
+
+                            found.append({
+
+                                "id":pid,
+
+                                "title":title,
+
+                                "body":body,
+
+                                "score":score,
+
+                                "source":
+                                "Reddit"
+
+                            })
+
+
+            except Exception as e:
+
+                print(
+                    "Reddit error",
+                    e
+                )
+
+
+    return found
 
 
 
-def create_embed(item):
+def embed(post):
 
-    score = item["score"]
+    e=discord.Embed(
 
+        title="🚀 Opportunity Found",
 
-    if score >= 8:
-
-        level = "🔥 Huge potential"
-
-    elif score >= 5:
-
-        level = "🟠 Interesting"
-
-    else:
-
-        level = "🟡 Worth checking"
-
-
-
-    embed = discord.Embed(
-
-        title="💡 " + item["title"],
-
-        description=clean(
-            item["body"]
-        ),
-
-        url=item["url"],
+        description=
+        clean(post["title"]),
 
         timestamp=datetime.now(
             timezone.utc
@@ -314,67 +256,60 @@ def create_embed(item):
     )
 
 
-    embed.add_field(
-
-        name="Opportunity Score",
-
-        value=f"{score}/10 {level}"
-
+    e.add_field(
+        name="Score",
+        value=f"{post['score']}/10"
     )
 
 
-    embed.add_field(
-
+    e.add_field(
         name="Source",
-
-        value=item["source"]
-
+        value=post["source"]
     )
 
 
-    embed.set_footer(
-
-        text="Opportunity Scout V2"
-
+    e.set_footer(
+        text="Opportunity Scout V4"
     )
 
 
-    return embed
+    return e
 
 
 
-async def send_scan(channel):
+async def scan():
 
-    opportunities = await find_opportunities()
+    channel=bot.get_channel(
+        CHANNEL_ID
+    )
 
 
-    if not opportunities:
-
-        await channel.send(
-            "🔎 No opportunities found this scan."
-        )
-
+    if not channel:
         return
 
 
-
-    await channel.send(
-
-        f"🚀 Found {len(opportunities)} possible ideas"
-
-    )
+    opportunities=await reddit_scan()
 
 
     for item in opportunities:
 
+        await save(item)
+
+
         await channel.send(
-
-            embed=create_embed(item)
-
+            embed=embed(item)
         )
 
-        await asyncio.sleep(1)
 
+
+@tasks.loop(minutes=10)
+async def scanner():
+
+    print(
+        "Scanning..."
+    )
+
+    await scan()
 
 
 
@@ -382,9 +317,11 @@ async def send_scan(channel):
 async def on_ready():
 
     print(
-        "Online:",
+        "Online",
         bot.user
     )
+
+    await setup_db()
 
 
     if not scanner.is_running():
@@ -393,27 +330,11 @@ async def on_ready():
 
 
 
-@tasks.loop(hours=6)
-async def scanner():
-
-    channel = bot.get_channel(
-        CHANNEL_ID
-    )
-
-
-    if channel:
-
-        await send_scan(
-            channel
-        )
-
-
-
 @bot.command()
 async def ping(ctx):
 
     await ctx.send(
-        "🟢 Opportunity Scout online"
+        "🟢 Scout online"
     )
 
 
@@ -422,12 +343,10 @@ async def ping(ctx):
 async def hunt(ctx):
 
     await ctx.send(
-        "🔎 Searching..."
+        "🔎 Manual scan started"
     )
 
-    await send_scan(
-        ctx.channel
-    )
+    await scan()
 
 
 
