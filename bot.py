@@ -7,53 +7,10 @@ import aiohttp
 import discord
 from discord.ext import commands, tasks
 
+
 TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID", "0"))
 
-SUBREDDITS = [
-    "SaaS",
-    "Entrepreneur",
-    "smallbusiness",
-    "SideProject",
-    "startups",
-    "webdev",
-    "programming",
-    "Minecraft",
-]
-
-KEYWORDS = [
-    "is there a tool",
-    "is there an app",
-    "looking for a tool",
-    "looking for software",
-    "looking for an app",
-    "does anyone know",
-    "i wish there was",
-    "would pay for",
-    "need a tool",
-    "need software",
-    "need an app",
-    "how do i automate",
-    "manual",
-    "tedious",
-    "annoying",
-    "painful",
-    "problem",
-    "frustrated",
-    "hate",
-    "struggle",
-    "takes too long",
-    "automate",
-    "alternative",
-    "better than",
-    "missing feature",
-    "wish",
-    "need help",
-    "any solution",
-    "recommend",
-    "recommendation",
-    "problem with",
-]
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -63,239 +20,415 @@ bot = commands.Bot(
     intents=intents
 )
 
-seen_posts = set()
+
+seen = set()
 
 
-def score_post(title, body, upvotes, comments):
-    text = f"{title} {body}".lower()
+PROBLEM_WORDS = [
+    "problem",
+    "issue",
+    "hate",
+    "annoying",
+    "frustrating",
+    "struggle",
+    "wish",
+    "need",
+    "looking for",
+    "alternative",
+    "missing",
+    "broken",
+    "slow",
+    "expensive",
+    "manual",
+    "hard",
+    "difficult",
+    "takes too long",
+    "automate",
+    "tool",
+    "software",
+    "app"
+]
+
+
+MONEY_WORDS = [
+    "pay",
+    "paid",
+    "customer",
+    "business",
+    "company",
+    "revenue",
+    "cost",
+    "price",
+    "subscription"
+]
+
+
+def analyze(title, text):
+
+    content = (
+        title + " " + text
+    ).lower()
 
     score = 0
 
-    for keyword in KEYWORDS:
-        if keyword in text:
+    for word in PROBLEM_WORDS:
+        if word in content:
             score += 1
 
-    if len(body) > 300:
+    for word in MONEY_WORDS:
+        if word in content:
+            score += 2
+
+    if len(text) > 500:
         score += 2
-
-    if len(body) > 800:
-        score += 1
-
-    money_words = [
-        "pay",
-        "paid",
-        "money",
-        "cost",
-        "price",
-        "customer",
-        "revenue",
-        "business",
-        "company",
-    ]
-
-    for word in money_words:
-        if word in text:
-            score += 1
-
-    if upvotes > 10:
-        score += 1
-
-    if comments > 10:
-        score += 1
 
     return min(score, 10)
 
 
-def clean_text(text, limit=700):
-    text = re.sub(r"\s+", " ", text).strip()
+def clean(text):
 
-    if len(text) > limit:
-        return text[:limit] + "..."
+    text = re.sub(
+        r"\s+",
+        " ",
+        text
+    )
 
-    return text
+    return text[:800]
 
 
-async def fetch_reddit(session, subreddit):
-    url = f"https://www.reddit.com/r/{subreddit}/new.json?limit=50"
+async def reddit_search(session):
+
+    subs = [
+        "Entrepreneur",
+        "SaaS",
+        "smallbusiness",
+        "SideProject",
+        "startups",
+        "webdev"
+    ]
+
+    results = []
 
     headers = {
-        "User-Agent": "OpportunityScout/1.1"
+        "User-Agent": "OpportunityScoutBot"
     }
 
-    try:
-        async with session.get(
-            url,
-            headers=headers,
-            timeout=15
-        ) as response:
 
-            if response.status != 200:
-                return []
+    for sub in subs:
 
-            data = await response.json()
+        try:
 
-            results = []
+            url = (
+                f"https://www.reddit.com/r/{sub}/hot.json?limit=20"
+            )
 
-            for child in data["data"]["children"]:
-                post = child["data"]
 
-                post_id = post.get("id")
+            async with session.get(
+                url,
+                headers=headers
+            ) as r:
 
-                if not post_id or post_id in seen_posts:
+
+                if r.status != 200:
                     continue
 
-                title = post.get("title", "")
-                body = post.get("selftext", "")
 
-                score = score_post(
-                    title,
-                    body,
-                    post.get("ups", 0),
-                    post.get("num_comments", 0)
+                data = await r.json()
+
+
+                for item in data["data"]["children"]:
+
+                    post = item["data"]
+
+                    pid = post["id"]
+
+                    if pid in seen:
+                        continue
+
+
+                    seen.add(pid)
+
+
+                    score = analyze(
+                        post.get("title",""),
+                        post.get("selftext","")
+                    )
+
+
+                    if score >= 3:
+
+                        results.append({
+
+                            "title":
+                                post.get("title",""),
+
+                            "body":
+                                post.get("selftext",""),
+
+                            "score":
+                                score,
+
+                            "url":
+                                "https://reddit.com"
+                                +
+                                post.get("permalink",""),
+
+                            "source":
+                                "Reddit r/" + sub
+                        })
+
+
+        except Exception as e:
+            print(
+                "Reddit error:",
+                e
+            )
+
+
+    return results
+
+
+
+async def hackernews_search(session):
+
+    results = []
+
+    try:
+
+        url = (
+            "https://hn.algolia.com/api/v1/search?"
+            "query=problem%20software"
+        )
+
+
+        async with session.get(url) as r:
+
+            data = await r.json()
+
+
+            for hit in data["hits"][:20]:
+
+                title = hit.get(
+                    "title",
+                    ""
                 )
 
-                if score >= 0:
+
+                score = analyze(
+                    title,
+                    ""
+                )
+
+
+                if score >= 2:
+
                     results.append({
-                        "id": post_id,
-                        "title": title,
-                        "body": body,
-                        "score": score,
-                        "url": "https://reddit.com" + post.get("permalink", ""),
-                        "source": f"r/{subreddit}"
+
+                        "title":
+                            title,
+
+                        "body":
+                            "Hacker News discussion",
+
+                        "score":
+                            score,
+
+                        "url":
+                            hit.get(
+                                "url",
+                                ""
+                            ),
+
+                        "source":
+                            "Hacker News"
+
                     })
 
-            return results
 
     except Exception as e:
-        print("Error:", e)
-        return []
+
+        print(
+            "HN error:",
+            e
+        )
 
 
-async def search_opportunities():
+    return results
 
-    opportunities = []
+
+
+async def find_opportunities():
 
     async with aiohttp.ClientSession() as session:
 
-        for subreddit in SUBREDDITS:
-            posts = await fetch_reddit(
-                session,
-                subreddit
-            )
+        results = []
 
-            opportunities.extend(posts)
+        results += await reddit_search(session)
 
-            await asyncio.sleep(1)
+        results += await hackernews_search(session)
 
-    opportunities.sort(
-        key=lambda x: x["score"],
+
+    results.sort(
+        key=lambda x:x["score"],
         reverse=True
     )
 
-    for item in opportunities:
-        seen_posts.add(item["id"])
 
-    return opportunities[:10]
+    return results[:10]
+
 
 
 def create_embed(item):
 
     score = item["score"]
 
+
     if score >= 8:
-        rating = "🔥 High Potential"
+
+        level = "🔥 Huge potential"
+
     elif score >= 5:
-        rating = "🟠 Interesting"
+
+        level = "🟠 Interesting"
+
     else:
-        rating = "🟡 Worth Checking"
+
+        level = "🟡 Worth checking"
+
+
 
     embed = discord.Embed(
+
         title="💡 " + item["title"],
+
+        description=clean(
+            item["body"]
+        ),
+
         url=item["url"],
-        description=clean_text(item["body"]),
-        timestamp=datetime.now(timezone.utc)
+
+        timestamp=datetime.now(
+            timezone.utc
+        )
+
     )
 
-    embed.add_field(
-        name="Score",
-        value=f"{score}/10 {rating}"
-    )
 
     embed.add_field(
+
+        name="Opportunity Score",
+
+        value=f"{score}/10 {level}"
+
+    )
+
+
+    embed.add_field(
+
         name="Source",
+
         value=item["source"]
+
     )
+
 
     embed.set_footer(
-        text="Opportunity Scout"
+
+        text="Opportunity Scout V2"
+
     )
+
 
     return embed
 
 
-async def send_results(channel):
 
-    opportunities = await search_opportunities()
+async def send_scan(channel):
+
+    opportunities = await find_opportunities()
+
 
     if not opportunities:
+
         await channel.send(
-            "🔎 No strong opportunities found yet."
+            "🔎 No opportunities found this scan."
         )
+
         return
 
+
+
     await channel.send(
-        f"🚀 Found {len(opportunities)} possible opportunities!"
+
+        f"🚀 Found {len(opportunities)} possible ideas"
+
     )
 
+
     for item in opportunities:
+
         await channel.send(
+
             embed=create_embed(item)
+
         )
 
         await asyncio.sleep(1)
+
+
 
 
 @bot.event
 async def on_ready():
 
     print(
-        f"Logged in as {bot.user}"
+        "Online:",
+        bot.user
     )
 
-    if not daily_scan.is_running():
-        daily_scan.start()
+
+    if not scanner.is_running():
+
+        scanner.start()
+
 
 
 @tasks.loop(hours=6)
-async def daily_scan():
+async def scanner():
 
-    channel = bot.get_channel(CHANNEL_ID)
-
-    if channel:
-        await send_results(channel)
-
-
-@bot.command()
-async def hunt(ctx):
-
-    await ctx.send(
-        "🔎 Hunting..."
+    channel = bot.get_channel(
+        CHANNEL_ID
     )
 
-    results = await search_opportunities()
 
-    for item in results[:5]:
-        await ctx.send(
-            embed=create_embed(item)
+    if channel:
+
+        await send_scan(
+            channel
         )
+
 
 
 @bot.command()
 async def ping(ctx):
 
     await ctx.send(
-        "🟢 Online"
+        "🟢 Opportunity Scout online"
     )
+
+
+
+@bot.command()
+async def hunt(ctx):
+
+    await ctx.send(
+        "🔎 Searching..."
+    )
+
+    await send_scan(
+        ctx.channel
+    )
+
 
 
 bot.run(TOKEN)
