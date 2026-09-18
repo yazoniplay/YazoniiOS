@@ -154,7 +154,7 @@ async def fetch_reddit(session, subreddit):
                     post.get("num_comments", 0)
                 )
 
-                if score >= 2:
+                if score >= 0:
                     results.append({
                         "id": post_id,
                         "title": title,
