@@ -11,6 +11,7 @@ from discord.ext import commands
 from analyzer import clean
 from database import setup_database, save, stats
 from scanner import scan_opportunities
+from ai import ask_gemini
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID", "0"))
@@ -115,6 +116,20 @@ async def stats_command(ctx):
     total, best = await stats()
     await ctx.send(f"📊 Opportunities found: {total} | Best score: {best}/10")
 
+@bot.command(name="ask")
+async def ask(ctx, *, prompt: str = ""):
+    if not prompt.strip():
+        await ctx.send("🧠 Usage: !ask <message>")
+        return
+    async with ctx.typing():
+        reply = await ask_gemini(prompt.strip())
+    if len(reply) <= 1900:
+        await ctx.send(reply)
+    else:
+        for i in range(0, len(reply), 1900):
+            await ctx.send(reply[i:i + 1900])
+            await asyncio.sleep(0.2)
+
 @bot.command()
 async def logs(ctx):
     if LAST_ERROR:
@@ -140,6 +155,7 @@ async def helpme(ctx):
         "!stats — opportunity statistics\n"
         "!logs — latest runtime error\n"
         "!system — safe system telemetry\n"
+        "!ask <message> — talk to Gemini\n"
         "!helpme — command list"
     )
 
