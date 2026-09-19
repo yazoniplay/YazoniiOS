@@ -60,7 +60,7 @@ async def github_issues(session):
     for x in out:
         k=x["title"].lower()
         if k not in unique or x["score"] > unique[k]["score"]: unique[k]=x
-    return sorted(unique.values(), key=lambda x:x["score"], reverse=True)[:10]
+    return sorted(unique.values(), key=lambda x:x["score"], reverse=True)[:3]
 
 async def scan_opportunities():
     async with aiohttp.ClientSession() as session:
@@ -68,4 +68,4 @@ async def scan_opportunities():
         results += await reddit(session)
         results += await hackernews(session)
         results += await github_issues(session)
-    return sorted(results, key=lambda x:x["score"], reverse=True)[:10]
+    return sorted(results, key=lambda x:x["score"], reverse=True)[:3]
