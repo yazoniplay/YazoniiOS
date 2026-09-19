@@ -1,32 +1,29 @@
-# FORGE
+# SIGNAL
 
-FORGE is a creator-commerce marketplace MVP.
+SIGNAL is a demand-discovery network MVP.
 
-The product thesis: creators should be able to publish useful digital products and give their audience one focused place to discover and buy them. The marketplace can later add creator payouts, real checkout, affiliate links, subscriptions, analytics, licensing and audience-owned storefronts.
+The thesis is deliberately different from the previous products: instead of building another marketplace or SaaS dashboard and hoping people want it, SIGNAL collects concrete problems from users and makes demand visible.
 
-## What is built now
+## MVP
 
-- Public marketplace/discovery page
-- Search
-- Category filtering
-- Creator accounts
-- Creator handles
-- Creator storefront dashboard
-- Product publishing
-- Product detail pages
-- Demo checkout flow
+- Public demand feed
+- Search and topic filters
+- User accounts
+- Public problem/demand signals
+- Urgency scoring
+- Related signals
+- Personal signal dashboard
+- Responsive dark interface
 - SQLite persistence
-- Responsive dark/orange interface
-- Password hashing
 - No AI dependency
+
+## Core loop
+
+person has a problem -> posts it -> others discover the same need -> builders can see concentrated demand -> future versions can let users follow/pledge interest and connect builders with demand.
 
 ## Why this direction
 
-Creator businesses are increasingly diversifying beyond ads into memberships, products and commerce. Current 2026 creator research also points to creators professionalizing their businesses and treating ownership/licensing and monetization infrastructure as important problems.
-
-The MVP intentionally proves the core loop before adding payment complexity:
-
-creator -> product -> discovery -> product page -> purchase intent
+Current 2026 app research points to users caring more about solving real problems and fixing broken basics than adding novelty. Recent complaint analysis also shows growth/customer acquisition and concrete unmet needs remain recurring pain points. The product is designed around revealed demand rather than a generic feature list.
 
 ## Run
 
@@ -40,30 +37,19 @@ Open http://localhost:5000
 
 ## Render
 
-Build:
+Build: `pip install -r requirements.txt`
 
-```bash
-pip install -r requirements.txt
-```
+Start: `gunicorn app:app`
 
-Start:
+Environment variable: `SECRET_KEY`
 
-```bash
-gunicorn app:app
-```
+## Next if validated
 
-Environment variable:
-
-- SECRET_KEY
-
-## Next build
-
-1. Real checkout
-2. Creator payout/onboarding flow
-3. Digital file delivery
-4. Creator storefront URLs
-5. Reviews and ratings
-6. Creator analytics
-7. Affiliate/commission links
-8. Moderation and reporting
-9. PostgreSQL for production
+1. Follow a signal
+2. Vote/pledge interest
+3. Builder profiles
+4. Demand clustering
+5. Verified proof-of-need
+6. Paid research / buyer-intent signals
+7. Builder-to-user matching
+8. PostgreSQL and moderation
