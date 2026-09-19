@@ -19,6 +19,7 @@ RUN_ONCE = os.getenv("RUN_ONCE", "false").lower() == "true"
 
 intents = discord.Intents.default()
 intents.message_content = True
+intents.messages = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 STARTED_AT = datetime.now(timezone.utc)
