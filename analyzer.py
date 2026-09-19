@@ -1,7 +1,5 @@
 import re
 
-# Strong, explicit evidence only. Generic words like "users", "business", or
-# "software" are deliberately NOT treated as buyer/problem signals.
 PROBLEM = [
     "i hate", "i'm frustrated", "im frustrated", "frustrating", "annoying",
     "painful", "tedious", "manual", "takes too long", "waste time",
@@ -15,8 +13,7 @@ PROBLEM = [
 SOLUTION_REQUEST = [
     "how do i", "how can i", "is there a tool", "is there an app",
     "what tool", "what app", "any tool", "any app", "alternative to",
-    "looking for", "need a tool", "need an app", "solution",
-    "recommend a", "recommendation"
+    "looking for", "need a tool", "need an app", "recommend a", "recommendation"
 ]
 
 PAYMENT = [
@@ -24,6 +21,20 @@ PAYMENT = [
     "take my money", "paying for", "paid for", "pay for",
     "worth paying", "budget for", "subscription", "too expensive",
     "expensive", "pricing", "price"
+]
+
+# Hard reject product launches/showcases. These are NOT opportunity reports.
+ANNOUNCEMENT_PATTERNS = [
+    r"^show\s+hn\s*:",
+    r"^show\s+hacker\s+news\s*:",
+    r"^i\s+(built|made|created|launched)\b",
+    r"^introducing\b",
+    r"^launching\b",
+    r"^built\s+this\b",
+    r"^my\s+project\b",
+    r"^open[- ]source\s+(platform|tool|app|project)\b",
+    r"^demo\s*:",
+    r"^\[?showcase\]?",
 ]
 
 GENERIC = [
@@ -48,6 +59,10 @@ def analyze(title, body, comments=0, age_hours=0):
     body = clean(body, 1400)
     text = f"{title} {body}".lower()
 
+    # Announcement/project posts are never opportunity signals.
+    if any(re.search(p, title.lower()) for p in ANNOUNCEMENT_PATTERNS):
+        return None
+
     if len(body.split()) < 45:
         return None
 
@@ -58,15 +73,9 @@ def analyze(title, body, comments=0, age_hours=0):
     solution_hits = [x for x in SOLUTION_REQUEST if x in text]
     payment_hits = [x for x in PAYMENT if x in text]
 
-    # A real opportunity needs an explicit pain + explicit attempt to find
-    # a solution. Payment evidence is strongly preferred and required for
-    # the highest scores.
-    if not problem_hits:
-        return None
-    if not solution_hits:
+    if not problem_hits or not solution_hits:
         return None
 
-    # Reject posts where the only "problem" is a generic software complaint.
     if len(problem_hits) < 2 and not payment_hits:
         return None
 
@@ -84,7 +93,6 @@ def analyze(title, body, comments=0, age_hours=0):
 
     score = min(10, score)
 
-    # No payment signal = never call it a 9/10 or 10/10.
     if not payment_hits:
         score = min(score, 8)
 
