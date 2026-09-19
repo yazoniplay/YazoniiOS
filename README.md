@@ -1,55 +1,57 @@
-# SIGNAL
+# AGENTREADY
 
-SIGNAL is a demand-discovery network MVP.
+AGENTREADY is an MVP for the emerging agentic-commerce layer.
 
-The thesis is deliberately different from the previous products: instead of building another marketplace or SaaS dashboard and hoping people want it, SIGNAL collects concrete problems from users and makes demand visible.
+## What it does
 
-## MVP
+Merchants enter product information once. AGENTREADY normalizes it into clean, machine-readable product records containing:
 
-- Public demand feed
-- Search and topic filters
-- User accounts
-- Public problem/demand signals
-- Urgency scoring
-- Related signals
-- Personal signal dashboard
-- Responsive dark interface
-- SQLite persistence
-- No AI dependency
+- product name and description
+- price and currency
+- availability
+- shipping information
+- product URL
+- structured attributes
 
-## Core loop
-
-person has a problem -> posts it -> others discover the same need -> builders can see concentrated demand -> future versions can let users follow/pledge interest and connect builders with demand.
+The product record can then become the base for future integrations with AI shopping channels and agent-commerce protocols.
 
 ## Why this direction
 
-Current 2026 app research points to users caring more about solving real problems and fixing broken basics than adding novelty. Recent complaint analysis also shows growth/customer acquisition and concrete unmet needs remain recurring pain points. The product is designed around revealed demand rather than a generic feature list.
+AI shopping is moving from simple recommendations toward discovery, checkout and autonomous purchasing. OpenAI/Stripe's Agentic Commerce Protocol and Shopify/Google's Universal Commerce Protocol are examples of the infrastructure shift. Shopify reports AI-driven traffic and AI-originated orders growing rapidly in 2026.
+
+The opportunity is not to compete with the major AI platforms. It is to build the merchant-side compatibility layer that lets smaller merchants participate across emerging agent channels.
+
+## MVP
+
+- Merchant accounts
+- Product catalog
+- Structured machine-readable output
+- Availability/shipping fields
+- Product URLs
+- Dashboard
+- Responsive UI
+- SQLite persistence
+- No AI API dependency
+
+## Next build
+
+1. Import Shopify/WooCommerce catalogs
+2. Automatic catalog validation
+3. JSON-LD generation
+4. ACP/UCP-compatible endpoints
+5. AI-channel visibility monitoring
+6. AI-originated order attribution
+7. Usage/transaction pricing
 
 ## Run
 
 ```bash
 pip install -r requirements.txt
-set SECRET_KEY=replace-with-a-long-random-secret
 python app.py
 ```
 
-Open http://localhost:5000
+Render start command:
 
-## Render
-
-Build: `pip install -r requirements.txt`
-
-Start: `gunicorn app:app`
-
-Environment variable: `SECRET_KEY`
-
-## Next if validated
-
-1. Follow a signal
-2. Vote/pledge interest
-3. Builder profiles
-4. Demand clustering
-5. Verified proof-of-need
-6. Paid research / buyer-intent signals
-7. Builder-to-user matching
-8. PostgreSQL and moderation
+```bash
+gunicorn app:app
+```
