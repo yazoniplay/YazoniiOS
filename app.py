@@ -12,7 +12,8 @@ DB_PATH = os.getenv("DATABASE_PATH", "leadflow.db")
 APP_PASSWORD = os.getenv("APP_PASSWORD", "")
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_PRO_PRICE_ID = os.getenv("STRIPE_PRO_PRICE_ID", "")
-STRIPE_TEAM_PRICE_ID = os.getenv("STRIPE_TEAM_PRICE_ID")
+STRIPE_TEAM_PRICE_ID = os.getenv("STRIPE_TEAM_PRICE_ID", "")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 STATUSES = ["New", "Contacted", "Qualified", "Won", "Lost"]
 PLANS = {
     "free": {"name": "Free", "price": "€0", "limit": 50, "seats": 1},
@@ -363,20 +364,51 @@ def checkout(plan):
             success_url=url_for("billing_success",plan=plan,_external=True),
             cancel_url=url_for("billing",_external=True),
             metadata={"workspace_id":str(session["workspace_id"]),"plan":plan},
+            subscription_data={"metadata":{"workspace_id":str(session["workspace_id"]),"plan":plan}},
         )
         return redirect(checkout_session.url)
     except Exception as e:
         flash("Stripe checkout could not be started: "+str(e))
         return redirect(url_for("billing"))
 
+@app.post("/stripe/webhook")
+def stripe_webhook():
+    if not STRIPE_WEBHOOK_SECRET:
+        return "Webhook secret not configured", 503
+    try:
+        import stripe
+        event = stripe.Webhook.construct_event(request.data, request.headers.get("Stripe-Signature",""), STRIPE_WEBHOOK_SECRET)
+    except Exception:
+        return "Invalid webhook", 400
+    obj = event.get("data", {}).get("object", {})
+    typ = event.get("type", "")
+    metadata = obj.get("metadata", {}) or {}
+    wid = metadata.get("workspace_id")
+    if typ == "checkout.session.completed" and wid:
+        plan = metadata.get("plan", "free")
+        if plan in PLANS:
+            db().execute("UPDATE workspaces SET plan=?,stripe_customer_id=?,stripe_subscription_id=? WHERE id=?",
+                         (plan,obj.get("customer"),obj.get("subscription"),wid))
+            db().commit()
+    elif typ == "customer.subscription.updated":
+        wid = metadata.get("workspace_id")
+        plan = metadata.get("plan", "free")
+        if wid and plan in PLANS:
+            db().execute("UPDATE workspaces SET plan=?,stripe_customer_id=?,stripe_subscription_id=? WHERE id=?",
+                         (plan,obj.get("customer"),obj.get("id"),wid))
+            db().commit()
+    elif typ == "customer.subscription.deleted":
+        wid = metadata.get("workspace_id")
+        if wid:
+            db().execute("UPDATE workspaces SET plan='free',stripe_subscription_id=NULL WHERE id=?",(wid,))
+            db().commit()
+    return "ok", 200
+
 @app.route("/billing/success")
 @login_required
 @workspace_required
 def billing_success():
-    plan=request.args.get("plan","pro")
-    if plan in ("pro","team"):
-        db().execute("UPDATE workspaces SET plan=? WHERE id=?",(plan,session["workspace_id"]));db().commit()
-        flash("Plan updated. For production billing, add a Stripe webhook so renewals and cancellations stay synchronized.")
+    flash("Checkout finished. Your plan will activate after Stripe confirms the payment.")
     return redirect(url_for("billing"))
 
 with app.app_context():
