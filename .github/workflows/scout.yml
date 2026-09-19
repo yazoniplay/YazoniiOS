@@ -18,6 +18,16 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
+      - name: Verify Gemini configuration
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -n "$GEMINI_API_KEY" ]; then
+            echo "GEMINI_API_KEY is present in the runner environment."
+          else
+            echo "GEMINI_API_KEY is MISSING from the runner environment."
+            exit 1
+          fi
       - name: Run one scan
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
