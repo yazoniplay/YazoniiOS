@@ -1,69 +1,86 @@
-import os,re,sqlite3,urllib.request
+import os,re,sqlite3,json
 from datetime import datetime
-from flask import Flask,g,request,render_template_string
+from urllib.request import Request,urlopen
+from urllib.parse import urlparse
+from flask import Flask,request,render_template_string
 
 app=Flask(__name__)
-app.secret_key=os.getenv("SECRET_KEY","dev-only-change-me")
-DB_PATH=os.getenv("DATABASE_PATH","accesspulse.db")
+DB=os.getenv("DATABASE_PATH","dropscout.db")
+app.secret_key=os.getenv("SECRET_KEY","dev")
 
-CSS="""<style>
-:root{--bg:#08090b;--p:#111318;--l:#292d35;--t:#f5f5f2;--m:#969aa3;--a:#ff6a00;--good:#65d391;--bad:#ff6b6b}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:15px Inter,system-ui,sans-serif}.shell{max-width:1100px;margin:auto;padding:0 22px}
-nav{height:70px;border-bottom:1px solid var(--l);display:flex;align-items:center;justify-content:space-between}.logo{font-weight:950;font-size:20px}.logo i{color:var(--a);font-style:normal}
-.btn{display:inline-block;padding:11px 15px;border:1px solid var(--l);border-radius:9px;background:#171a20;color:#fff;cursor:pointer}.primary{background:var(--a);border-color:var(--a);color:#111;font-weight:850}
-.hero{padding:85px 0 60px;max-width:880px}.k{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#ff9a4d;font-weight:850}h1{font-size:clamp(44px,7vw,76px);line-height:.98;letter-spacing:-3px;margin:14px 0 20px}.hero p{font-size:19px;color:var(--m);line-height:1.55}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:25px}
-.form{display:flex;gap:8px;margin:25px 0}.form input{flex:1;background:#0c0d10;border:1px solid var(--l);color:#fff;padding:12px;border-radius:9px}.panel{background:var(--p);border:1px solid var(--l);border-radius:15px;padding:23px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.score{font-size:40px;font-weight:950}.good{color:var(--good)}.bad{color:var(--bad)}.warn{color:#ffb15c}.muted{color:var(--m)}.issue{border-top:1px solid var(--l);padding:15px 0}.issue:first-child{border-top:0}.tag{display:inline-block;border-radius:999px;padding:4px 8px;font-size:11px;background:#1c120c;color:#ffad75}
-.statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0}.stat{background:var(--p);border:1px solid var(--l);border-radius:13px;padding:18px}.stat b{display:block;font-size:27px;margin-top:5px}.footer{border-top:1px solid var(--l);padding:28px 0;color:var(--m);font-size:13px}
-@media(max-width:700px){.grid,.statgrid{grid-template-columns:1fr}}
+STYLE="""<style>
+:root{--bg:#07080a;--panel:#101217;--line:#292d35;--text:#f4f5f7;--muted:#9499a3;--accent:#ff6a00;--green:#69d39b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px system-ui,sans-serif}.wrap{max-width:1050px;margin:auto;padding:0 20px}nav{height:68px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}.brand{font-weight:950;font-size:19px}.brand span{color:var(--accent)}a{color:inherit;text-decoration:none}.hero{padding:80px 0 45px;max-width:850px}.eyebrow{color:#ff9a55;text-transform:uppercase;font-size:12px;font-weight:850;letter-spacing:1.5px}h1{font-size:clamp(42px,7vw,72px);line-height:.98;letter-spacing:-3px;margin:12px 0 18px}.lead{font-size:19px;color:var(--muted);line-height:1.55}.form{display:flex;gap:8px;margin:25px 0}.form input{flex:1;min-width:0;background:#0c0e12;border:1px solid var(--line);border-radius:10px;padding:13px;color:white}.btn{border:1px solid var(--line);background:#171a20;color:white;border-radius:10px;padding:12px 17px;font-weight:800;cursor:pointer}.primary{background:var(--accent);border-color:var(--accent);color:#101010}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:22px}.price{font-size:40px;font-weight:950}.muted{color:var(--muted)}.tag{display:inline-block;background:#1d130d;color:#ffad76;padding:5px 9px;border-radius:999px;font-size:11px;font-weight:800}.history{margin-top:20px}.row{display:flex;justify-content:space-between;gap:15px;padding:14px 0;border-top:1px solid var(--line)}.green{color:var(--green)}.small{font-size:13px}.error{border:1px solid #653434;background:#211112;padding:14px;border-radius:10px;color:#ff9b9b}.footer{padding:35px 0;color:var(--muted);font-size:12px;border-top:1px solid var(--line);margin-top:50px}@media(max-width:700px){.grid{grid-template-columns:1fr}.form{flex-direction:column}}
 </style>"""
-BASE="""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{title}} · AccessPulse</title>"""+CSS+"""</head><body><div class="shell"><nav><a class="logo" href="/">ACCESSPULSE<i>.</i></a><span class="muted">EU accessibility monitor</span></nav>{{body|safe}}<footer class="footer">Automated checks are indicators, not legal certification.</footer></div></body></html>"""
+BASE="""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{title}} · DropScout</title>"""+STYLE+"""</head><body><div class="wrap"><nav><a class="brand" href="/">DROPSCOUT<span>.</span></a><span class="muted small">Price intelligence</span></nav>{{body|safe}}<footer class="footer">Prices are read from publicly available product pages. Always verify the final price at the retailer.</footer></div></body></html>"""
 
-def db():
- if "db" not in g:g.db=sqlite3.connect(DB_PATH);g.db.row_factory=sqlite3.Row
- return g.db
-@app.teardown_appcontext
-def close(e):
- c=g.pop("db",None)
- if c:c.close()
+def conn():
+ c=sqlite3.connect(DB);c.row_factory=sqlite3.Row;return c
+
 def init():
- c=sqlite3.connect(DB_PATH);c.execute("CREATE TABLE IF NOT EXISTS scans(id INTEGER PRIMARY KEY AUTOINCREMENT,url TEXT NOT NULL,score INTEGER NOT NULL,issues TEXT NOT NULL,created_at TEXT NOT NULL)");c.commit();c.close()
+ c=conn();c.execute("CREATE TABLE IF NOT EXISTS watches(id INTEGER PRIMARY KEY AUTOINCREMENT,url TEXT NOT NULL,domain TEXT NOT NULL,title TEXT,price REAL,currency TEXT,created_at TEXT NOT NULL)");c.commit();c.close()
 
-def scan(url):
+def extract(url):
  if not re.match(r"^https?://",url):url="https://"+url
- try:
-  req=urllib.request.Request(url,headers={"User-Agent":"AccessPulse/1.0 accessibility checker"})
-  with urllib.request.urlopen(req,timeout=8) as r: raw=r.read(700000).decode("utf-8","ignore"); status=r.status; final=r.geturl()
- except Exception as e:return {"error":str(e)}
- issues=[]
- def add(key,severity,msg,fix):issues.append({"key":key,"severity":severity,"msg":msg,"fix":fix})
- imgs=re.findall(r"<img\b[^>]*>",raw,re.I)
- missing=[x for x in imgs if not re.search(r'\balt\s*=',x,re.I)]
- if missing:add("IMG_ALT","high",f"{len(missing)} image(s) appear to be missing alt attributes.","Add meaningful alt text to informative images; use empty alt for decorative images.")
- if not re.search(r"<html\b[^>]*\blang\s*=",raw,re.I):add("HTML_LANG","medium","The <html> element has no lang attribute.","Add the page language, e.g. <html lang="en">.")
- if not re.search(r"<title\b[^>]*>.*?</title>",raw,re.I|re.S):add("TITLE","high","No HTML title element was detected.","Add a concise, descriptive <title>.")
- headings=re.findall(r"<h([1-6])\b",raw,re.I)
- if not headings:add("HEADINGS","medium","No heading elements were detected.","Use a logical heading structure to describe page sections.")
- if not re.search(r"<main\b",raw,re.I):add("LANDMARK_MAIN","low","No <main> landmark was detected.","Wrap the primary page content in a <main> landmark.")
- if not re.search(r"""<meta\b[^>]*name=["']viewport""",raw,re.I):add("VIEWPORT","low","No responsive viewport meta tag was detected.","Add a viewport meta tag for mobile accessibility.")
- if re.search(r"<input\b",raw,re.I) and not re.search(r"<label\b",raw,re.I):add("FORM_LABELS","high","Form controls were detected but no label element was found.","Associate every form control with a visible label.")
- if re.search(r"(<a\b[^>]*>\s*</a>|<button\b[^>]*>\s*</button>)",raw,re.I|re.S):add("EMPTY_CONTROLS","medium","An apparently empty link or button was detected.","Give interactive controls an accessible name.")
- if re.search(r"<marquee\b|blink\b",raw,re.I):add("OBSOLETE_MOTION","medium","Obsolete motion elements were detected.","Replace obsolete motion elements with accessible, user-controlled alternatives.")
- score=max(0,100-len(issues)*12-sum(8 for x in issues if x["severity"]=="high"))
- return {"status":status,"final":final,"score":score,"issues":issues}
+ req=Request(url,headers={"User-Agent":"Mozilla/5.0 DropScout/1.0"})
+ with urlopen(req,timeout=10) as r:
+  html=r.read(900000).decode("utf-8","ignore");final=r.geturl()
+ title=""
+ m=re.search(r"<title[^>]*>(.*?)</title>",html,re.I|re.S)
+ if m:title=re.sub(r"\s+"," ",m.group(1)).strip()[:180]
+ currency="";price=None
+ ld=re.findall(r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',html,re.I|re.S)
+ for block in ld:
+  try:
+   data=json.loads(block)
+   items=data if isinstance(data,list) else [data]
+   stack=items[:]
+   while stack:
+    x=stack.pop()
+    if isinstance(x,dict):
+     offers=x.get("offers")
+     if isinstance(offers,dict):
+      p=offers.get("price")
+      if p is not None:
+       try:price=float(str(p).replace(",",""));currency=str(offers.get("priceCurrency") or "")
+       except:pass
+       if price is not None:break
+     for v in x.values():
+      if isinstance(v,(dict,list)):stack.extend(v if isinstance(v,list) else [v])
+    elif isinstance(x,list):stack.extend(x)
+   if price is not None:break
+  except:pass
+ if price is None:
+  patterns=[
+   r'itemprop=["\']price["\'][^>]*content=["\']([0-9]+(?:[.,][0-9]{1,2})?)',
+   r'["\']price["\']\s*[:=]\s*["\']?([0-9]+(?:[.,][0-9]{1,2})?)'
+  ]
+  for ptn in patterns:
+   m=re.search(ptn,html,re.I)
+   if m:
+    try:price=float(m.group(1).replace(",","."));break
+    except:pass
+ if not currency:
+  m=re.search(r'itemprop=["\']priceCurrency["\'][^>]*content=["\']([A-Z]{3})',html,re.I)
+  if m:currency=m.group(1).upper()
+ domain=urlparse(final).netloc
+ return {"url":final,"domain":domain,"title":title or domain,"price":price,"currency":currency or "","checked":datetime.utcnow().isoformat()}
 
 @app.route("/",methods=["GET","POST"])
 def home():
- result=None
+ result=None;error=None;history=[]
  if request.method=="POST":
   url=request.form.get("url","").strip()
   if url:
-   result=scan(url)
-   if "error" not in result:
-    db().execute("INSERT INTO scans(url,score,issues,created_at) VALUES(?,?,?,?)",(url,result["score"],str(result["issues"]),datetime.utcnow().isoformat()));db().commit()
- body=render_template_string("""<section class="hero"><div class="k">Accessibility monitoring</div><h1>Find accessibility problems before your customers do.</h1><p>Enter a public URL. AccessPulse runs a fast automated accessibility pre-check and turns the result into a clear fix list.</p><form class="form" method="post"><input name="url" placeholder="https://yourstore.com" required><button class="btn primary">Scan website</button></form><p class="muted">Built for the EU market, where the European Accessibility Act applies to covered products and services including e-commerce.</p></section>
-{%if result%}{%if result.error%}<div class="panel"><h2>Scan failed</h2><p class="muted">{{result.error}}</p></div>{%else%}<section class="grid"><div class="panel"><div class="k">Automated result</div><div class="score {{'good' if result.score>=80 else 'warn' if result.score>=60 else 'bad'}}">{{result.score}}/100</div><p class="muted">{{result.final}}</p><p><span class="tag">{{result.issues|length}} detected issue(s)</span></p></div><div class="panel"><div class="k">What to fix</div>{%if result.issues%}{%for x in result.issues%}<div class="issue"><span class="tag">{{x.severity}}</span><b>{{x.msg}}</b><p class="muted">{{x.fix}}</p></div>{%endfor%}{%else%}<h3>No issues detected by these checks.</h3><p class="muted">Automated checks cannot prove full conformance.</p>{%endif%}</div></section>{%endif%}{%endif%}
-<section class="statgrid"><div class="stat"><span class="muted">Checks</span><b>Automated</b></div><div class="stat"><span class="muted">Output</span><b>Fix list</b></div><div class="stat"><span class="muted">Positioning</span><b>EU-first</b></div></section>""",result=result)
- return render_template_string(BASE,title="Website scanner",body=body)
+   try:
+    result=extract(url)
+    if result["price"] is None: error="I could open the page, but I couldn't reliably find a product price. Try a product page with structured price data."
+    else:
+     c=conn();c.execute("INSERT INTO watches(url,domain,title,price,currency,created_at) VALUES(?,?,?,?,?,?)",(result["url"],result["domain"],result["title"],result["price"],result["currency"],result["checked"]));c.commit()
+     history=c.execute("SELECT * FROM watches WHERE url=? ORDER BY id DESC LIMIT 10",(result["url"],)).fetchall();c.close()
+   except Exception as e:error="Could not read that page. Check the URL and try again."
+ body=render_template_string("""<section class="hero"><div class="eyebrow">Consumer price intelligence</div><h1>Know if the price is actually worth it.</h1><p class="lead">Paste a product link. DropScout extracts the current price, records it, and builds a simple price trail so you can spot changes instead of guessing.</p><form class="form" method="post"><input name="url" placeholder="Paste a product URL…" required><button class="btn primary">Check price</button></form>{%if error%}<div class="error">{{error}}</div>{%endif%}</section>{%if result and not error%}<section class="grid"><div class="panel"><div class="eyebrow">Current listing</div><h2>{{result.title}}</h2><div class="price">{{"%.2f"|format(result.price)}} {{result.currency}}</div><p class="muted small">{{result.domain}}</p><a class="btn" href="{{result.url}}" target="_blank">Open retailer ↗</a></div><div class="panel"><div class="eyebrow">Price trail</div>{%if history|length>1%}<p class="green">Price history captured.</p>{%else%}<p>No history yet. Check this product again after the price changes.</p>{%endif%}{%for x in history%}<div class="row"><span class="muted small">{{x.created_at[:16].replace("T"," ")}} UTC</span><b>{{"%.2f"|format(x.price)}} {{x.currency}}</b></div>{%endfor%}</div></section>{%endif%}<section class="grid" style="margin-top:14px"><div class="panel"><span class="tag">NEXT</span><h3>Automatic tracking</h3><p class="muted">Turn one-time checks into watchlists, scheduled rechecks and price-drop alerts.</p></div><div class="panel"><span class="tag">BUSINESS MODEL</span><h3>Free → Pro</h3><p class="muted">Free checks. Paid monitoring and alerts. Long-term expansion can add retailer comparison and affiliate commerce.</p></div></section>""",result=result,error=error,history=history)
+ return render_template_string(BASE,title="Price tracker",body=body)
 
-with app.app_context():init()
+init()
 if __name__=="__main__":app.run(host="0.0.0.0",port=int(os.getenv("PORT","5000")))
