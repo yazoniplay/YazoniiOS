@@ -44,7 +44,7 @@ def scan(url):
  headings=re.findall(r"<h([1-6])\b",raw,re.I)
  if not headings:add("HEADINGS","medium","No heading elements were detected.","Use a logical heading structure to describe page sections.")
  if not re.search(r"<main\b",raw,re.I):add("LANDMARK_MAIN","low","No <main> landmark was detected.","Wrap the primary page content in a <main> landmark.")
- if not re.search(r"<meta\b[^>]*name=["']viewport",raw,re.I):add("VIEWPORT","low","No responsive viewport meta tag was detected.","Add a viewport meta tag for mobile accessibility.")
+ if not re.search(r"""<meta\b[^>]*name=["']viewport""",raw,re.I):add("VIEWPORT","low","No responsive viewport meta tag was detected.","Add a viewport meta tag for mobile accessibility.")
  if re.search(r"<input\b",raw,re.I) and not re.search(r"<label\b",raw,re.I):add("FORM_LABELS","high","Form controls were detected but no label element was found.","Associate every form control with a visible label.")
  if re.search(r"(<a\b[^>]*>\s*</a>|<button\b[^>]*>\s*</button>)",raw,re.I|re.S):add("EMPTY_CONTROLS","medium","An apparently empty link or button was detected.","Give interactive controls an accessible name.")
  if re.search(r"<marquee\b|blink\b",raw,re.I):add("OBSOLETE_MOTION","medium","Obsolete motion elements were detected.","Replace obsolete motion elements with accessible, user-controlled alternatives.")
