@@ -1,47 +1,43 @@
-# AGENTREADY
+# AccessPulse
 
-AGENTREADY is an MVP for the emerging agentic-commerce layer.
+AccessPulse is an EU-first website accessibility monitoring MVP.
 
-## What it does
+## Why this market
 
-Merchants enter product information once. AGENTREADY normalizes it into clean, machine-readable product records containing:
-
-- product name and description
-- price and currency
-- availability
-- shipping information
-- product URL
-- structured attributes
-
-The product record can then become the base for future integrations with AI shopping channels and agent-commerce protocols.
-
-## Why this direction
-
-AI shopping is moving from simple recommendations toward discovery, checkout and autonomous purchasing. OpenAI/Stripe's Agentic Commerce Protocol and Shopify/Google's Universal Commerce Protocol are examples of the infrastructure shift. Shopify reports AI-driven traffic and AI-originated orders growing rapidly in 2026.
-
-The opportunity is not to compete with the major AI platforms. It is to build the merchant-side compatibility layer that lets smaller merchants participate across emerging agent channels.
+The European Accessibility Act entered application on June 28, 2025. The European Commission says covered services include e-commerce, and the EU estimates around 100 million people in the EU live with a disability. Accessibility is therefore not just a design preference; for covered businesses it can become a compliance and market-access concern.
 
 ## MVP
 
-- Merchant accounts
-- Product catalog
-- Structured machine-readable output
-- Availability/shipping fields
-- Product URLs
-- Dashboard
-- Responsive UI
-- SQLite persistence
-- No AI API dependency
+Paste a public URL and AccessPulse performs a fast automated pre-check for common issues:
+
+- missing image alt attributes
+- missing HTML language
+- missing page title
+- missing headings
+- missing main landmark
+- missing viewport metadata
+- missing form labels
+- apparently empty controls
+- obsolete motion elements
+
+It produces a score and a concrete fix list.
+
+## Important
+
+This is **not legal certification** and automated tests cannot establish full WCAG/EN 301 549 conformance. It is a lead-generation and monitoring starting point.
 
 ## Next build
 
-1. Import Shopify/WooCommerce catalogs
-2. Automatic catalog validation
-3. JSON-LD generation
-4. ACP/UCP-compatible endpoints
-5. AI-channel visibility monitoring
-6. AI-originated order attribution
-7. Usage/transaction pricing
+1. Crawl an entire domain
+2. WCAG/EN 301 549 rule engine
+3. Scheduled rescans
+4. Change detection
+5. PDF/CSV reports
+6. Accessibility statement generator
+7. Shopify/WooCommerce connectors
+8. Team workspaces
+9. Paid monitoring plans
+10. Human-audit marketplace/integration
 
 ## Run
 
@@ -50,7 +46,7 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Render start command:
+Render start:
 
 ```bash
 gunicorn app:app
