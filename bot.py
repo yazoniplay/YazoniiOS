@@ -160,6 +160,26 @@ async def helpme(ctx):
     )
 
 @bot.event
+async def on_message(message):
+    if message.author.bot:
+        return
+
+    await bot.process_commands(message)
+
+    if bot.user and bot.user.mentioned_in(message) and not message.mention_everyone:
+        prompt = message.content
+        prompt = prompt.replace(f"<@{bot.user.id}>", "").replace(f"<@!{bot.user.id}>", "").strip()
+        if prompt:
+            async with message.channel.typing():
+                reply = await ask_gemini(prompt)
+            if len(reply) <= 1900:
+                await message.reply(reply, mention_author=False)
+            else:
+                for i in range(0, len(reply), 1900):
+                    await message.channel.send(reply[i:i + 1900])
+                    await asyncio.sleep(0.2)
+
+@bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
         return
