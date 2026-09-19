@@ -1,29 +1,70 @@
 # Yazoni LeadFlow
 
-A focused sales pipeline MVP for small businesses.
+LeadFlow is a small-business sales workspace built around one job: keep leads organized and turn follow-ups into revenue.
 
-## What it solves
-LeadFlow keeps potential customers, pipeline value, statuses, notes, and next follow-up dates in one place.
+## Current product
+
+- Account signup and password login
+- Separate workspaces
+- Workspace members and invite links
+- Owner/member roles
+- Lead pipeline with statuses
+- Pipeline and won-value dashboard
+- Follow-up dashboard
+- CSV import/export
+- Email actions
+- Free / Pro / Team plan structure
+- Stripe Checkout integration scaffold for recurring subscriptions
+- Lead and seat limits by plan
+- No AI dependency
 
 ## Run locally
+
 ```bash
 pip install -r requirements.txt
-set APP_PASSWORD=your-password
+set APP_PASSWORD=optional-legacy-password
+set SECRET_KEY=replace-this
 python app.py
 ```
 
-On Render:
-- Build command: `pip install -r requirements.txt`
-- Start command: `gunicorn app:app`
-- Environment variables: `APP_PASSWORD`, `SECRET_KEY`
-- For production persistence, attach a persistent disk or move the database to managed PostgreSQL.
+Open `http://localhost:5000`.
 
-## MVP roadmap
-1. Lead dashboard and pipeline
-2. Follow-up reminders
-3. Import leads from CSV
-4. Email integrations
-5. Team accounts
-6. Stripe subscriptions
+## Render
 
-This repository intentionally has no AI dependency.
+Build command:
+
+```bash
+pip install -r requirements.txt
+```
+
+Start command:
+
+```bash
+gunicorn app:app
+```
+
+Recommended environment variables:
+
+- `SECRET_KEY`
+- `APP_PASSWORD` (optional legacy access)
+- `STRIPE_SECRET_KEY`
+- `STRIPE_PRO_PRICE_ID`
+- `STRIPE_TEAM_PRICE_ID`
+
+For real production data, use managed PostgreSQL rather than a local SQLite file. The current SQLite implementation is designed to keep the MVP easy to run while the product architecture is being validated.
+
+## Billing
+
+LeadFlow creates Stripe Checkout Sessions in subscription mode when Stripe is configured. Stripe Checkout handles payment collection; LeadFlow does not store card details.
+
+A production launch should also add Stripe webhooks for subscription creation, renewal, cancellation, and failed payment state synchronization.
+
+## Product roadmap
+
+1. Accounts, workspaces and teams — implemented
+2. Billing and subscription checkout — implemented as Stripe integration
+3. Stripe webhooks and subscription state sync
+4. Managed PostgreSQL
+5. Role permissions and audit log
+6. Automated follow-up email delivery
+7. Analytics and revenue reporting
