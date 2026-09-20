@@ -1,35 +1,58 @@
-# DropScout
+# YazoniiOS
 
-DropScout is a consumer price-intelligence MVP: paste a public product URL, extract the current price, and build a simple price trail.
+YazoniiOS is an automated prospect-intelligence system for discovering public business websites, crawling their public pages, analyzing opportunities with Gemini, scoring prospects, and delivering actionable reports to Discord.
 
-## Why this direction
+## What it does
 
-Digital commerce keeps expanding, and subscription spending continues to grow. The product has a direct consumer value proposition: help people decide when a product is worth buying.
+- Discover businesses from configurable search queries using the Brave Search API.
+- Deduplicate domains and persist prospects in SQLite.
+- Crawl the public website with robots.txt awareness, same-domain limits, timeouts, size limits, and URL normalization.
+- Extract useful business/site signals: title, description, headings, contact signals, social links, forms, analytics, CMS hints, HTTPS, performance-related hints, missing metadata, and page inventory.
+- Analyze the evidence with Gemini and require structured JSON output.
+- Score opportunities using transparent deterministic factors plus the AI analysis.
+- Send rich prospect reports to Discord through a webhook.
+- Run on demand or continuously on a configurable schedule.
+- Keep API keys and webhooks in environment variables.
 
-## MVP
-- product URL input
-- public-page fetching
-- JSON-LD price extraction
-- fallback price extraction
-- current price display
-- retailer link
-- stored price history
-- mobile-friendly UI
+## Environment
 
-## Product roadmap
-1. Watchlists
-2. Scheduled rechecks
-3. Price-drop notifications
-4. Cross-retailer comparison
-5. Product matching
-6. Browser extension
-7. Affiliate links
-8. Personalized deal feeds
+Copy `.env.example` to `.env` and configure:
+
+- `GEMINI_API_KEY`
+- `GEMINI_MODEL` (default: `gemini-3.6-flash`)
+- `BRAVE_SEARCH_API_KEY`
+- `DISCORD_WEBHOOK_URL`
+- `DATABASE_PATH` (default: `yazonii.db`)
+- `DISCOVERY_INTERVAL_MINUTES` (default: `60`)
+- `MAX_RESULTS_PER_QUERY` (default: `20`)
+- `MAX_CRAWL_PAGES` (default: `12`)
+- `CRAWL_CONCURRENCY` (default: `4`)
 
 ## Run
+
 ```bash
 pip install -r requirements.txt
-gunicorn app:app
+python app.py
 ```
 
-No AI API is required.
+Dashboard: `http://localhost:5000`
+
+Run a scan from the dashboard or:
+
+```bash
+curl -X POST http://localhost:5000/api/scans \
+  -H "Content-Type: application/json" \
+  -d '{"queries":["dentist stockholm","restaurant stockholm","construction company stockholm"]}'
+```
+
+The service also exposes `/health`.
+
+## Safety and crawling boundaries
+
+The crawler only requests publicly reachable HTTP(S) pages, honors robots.txt when enabled, stays on the target domain, limits page count/size, and does not attempt authentication, CAPTCHA bypasses, stealth, or access-control circumvention.
+
+## Architecture
+
+```
+Discovery -> Domain normalization -> Crawl -> Signal extraction -> Gemini analysis -> Scoring -> SQLite -> Discord
+```
