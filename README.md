@@ -1,58 +1,45 @@
 # YazoniiOS
 
-YazoniiOS is an automated prospect-intelligence system for discovering public business websites, crawling their public pages, analyzing opportunities with Gemini, scoring prospects, and delivering actionable reports to Discord.
+Automated prospect intelligence: discover public business websites, crawl them, analyze observable opportunities with Gemini, score the evidence, store results, and deliver reports to Discord.
 
-## What it does
+## Features
+- Brave Search discovery with configurable queries
+- Domain deduplication and SQLite persistence
+- Public-site crawler with robots.txt support, same-domain limits, timeouts and byte/page caps
+- Extraction of titles, descriptions, text and links
+- Gemini structured analysis with evidence, pain points, opportunities, confidence and score
+- Discord webhook reports
+- Flask dashboard and JSON API
+- Scheduled recurring scans
 
-- Discover businesses from configurable search queries using the Brave Search API.
-- Deduplicate domains and persist prospects in SQLite.
-- Crawl the public website with robots.txt awareness, same-domain limits, timeouts, size limits, and URL normalization.
-- Extract useful business/site signals: title, description, headings, contact signals, social links, forms, analytics, CMS hints, HTTPS, performance-related hints, missing metadata, and page inventory.
-- Analyze the evidence with Gemini and require structured JSON output.
-- Score opportunities using transparent deterministic factors plus the AI analysis.
-- Send rich prospect reports to Discord through a webhook.
-- Run on demand or continuously on a configurable schedule.
-- Keep API keys and webhooks in environment variables.
+## Setup
+Copy .env.example to .env and add your keys:
+GEMINI_API_KEY=
+BRAVE_SEARCH_API_KEY=
+DISCORD_WEBHOOK_URL=
 
-## Environment
+Optional:
+GEMINI_MODEL=gemini-3.6-flash
+DATABASE_PATH=yazonii.db
+DISCOVERY_INTERVAL_MINUTES=60
+MAX_RESULTS_PER_QUERY=20
+MAX_CRAWL_PAGES=12
+MAX_CRAWL_CONCURRENCY=4
+CRAWL_TIMEOUT_SECONDS=12
+CRAWL_MAX_BYTES=1500000
+HONOR_ROBOTS=true
+DEFAULT_QUERIES=dentist stockholm,restaurant stockholm,construction company stockholm
 
-Copy `.env.example` to `.env` and configure:
-
-- `GEMINI_API_KEY`
-- `GEMINI_MODEL` (default: `gemini-3.6-flash`)
-- `BRAVE_SEARCH_API_KEY`
-- `DISCORD_WEBHOOK_URL`
-- `DATABASE_PATH` (default: `yazonii.db`)
-- `DISCOVERY_INTERVAL_MINUTES` (default: `60`)
-- `MAX_RESULTS_PER_QUERY` (default: `20`)
-- `MAX_CRAWL_PAGES` (default: `12`)
-- `CRAWL_CONCURRENCY` (default: `4`)
-
-## Run
-
+Run:
 ```bash
 pip install -r requirements.txt
 python app.py
 ```
+Open http://localhost:5000.
 
-Dashboard: `http://localhost:5000`
-
-Run a scan from the dashboard or:
-
-```bash
-curl -X POST http://localhost:5000/api/scans \
-  -H "Content-Type: application/json" \
-  -d '{"queries":["dentist stockholm","restaurant stockholm","construction company stockholm"]}'
+API:
+```
+curl -X POST http://localhost:5000/api/scans -H "Content-Type: application/json" -d '{"queries":["dentist stockholm","restaurant stockholm"]}'
 ```
 
-The service also exposes `/health`.
-
-## Safety and crawling boundaries
-
-The crawler only requests publicly reachable HTTP(S) pages, honors robots.txt when enabled, stays on the target domain, limits page count/size, and does not attempt authentication, CAPTCHA bypasses, stealth, or access-control circumvention.
-
-## Architecture
-
-```
-Discovery -> Domain normalization -> Crawl -> Signal extraction -> Gemini analysis -> Scoring -> SQLite -> Discord
-```
+The crawler is limited to publicly reachable HTTP(S) pages and does not attempt authentication, CAPTCHA bypasses, stealth, or access-control circumvention.
