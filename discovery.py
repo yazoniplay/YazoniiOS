@@ -1,5 +1,6 @@
 import os
 import time
+from datetime import datetime, timezone
 from urllib.parse import parse_qs, unquote, urljoin, urlparse
 
 import requests
@@ -11,24 +12,21 @@ class DiscoveryError(Exception):
 
 
 SEARCH_URL = "https://html.duckduckgo.com/html/"
+REDDIT_SEARCH_URL = "https://www.reddit.com/search.json"
 
 
 def _clean_result_url(href):
     if not href:
         return None
-
     href = urljoin(SEARCH_URL, href)
     parsed = urlparse(href)
-
     if parsed.path.startswith("/l/"):
         target = parse_qs(parsed.query).get("uddg", [None])[0]
         if target:
             href = unquote(target)
-
     parsed = urlparse(href)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
         return None
-
     return href
 
 
@@ -38,15 +36,59 @@ def _host(url):
     return host[4:] if host.startswith("www.") else host
 
 
+def _reddit_candidates(session, query, per_query, seen):
+    try:
+        response = session.get(
+            REDDIT_SEARCH_URL,
+            params={"q": query, "sort": "new", "t": "week", "limit": per_query, "raw_json": 1},
+            headers={"Accept": "application/json"},
+            timeout=15,
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except (requests.RequestException, ValueError) as exc:
+        raise DiscoveryError(f"Reddit search failed for '{query}': {exc}") from exc
+
+    max_age_days = max(1, min(int(os.getenv("REDDIT_MAX_AGE_DAYS", "5")), 7))
+    cutoff = datetime.now(timezone.utc).timestamp() - (max_age_days * 86400)
+    found = []
+
+    for child in payload.get("data", {}).get("children", []):
+        data = child.get("data") or {}
+        created = float(data.get("created_utc") or 0)
+        permalink = data.get("permalink")
+        post_id = data.get("id")
+        if not permalink or not post_id or created < cutoff:
+            continue
+
+        url = "https://www.reddit.com" + permalink
+        domain = f"reddit:{post_id}"
+        if domain in seen:
+            continue
+
+        seen.add(domain)
+        found.append(
+            {
+                "url": url,
+                "domain": domain,
+                "title": data.get("title") or "Reddit discussion",
+                "description": BeautifulSoup(data.get("selftext") or "", "html.parser").get_text(" ", strip=True)[:3000],
+                "query": query,
+                "source": "reddit",
+                "subreddit": data.get("subreddit", ""),
+                "created_utc": created,
+            }
+        )
+
+    return found
+
+
 def discover(queries, count=20):
-    """Discover public business websites without a paid search API."""
+    """Discover public websites and recent Reddit discussions without a paid API."""
     session = requests.Session()
     session.headers.update(
         {
-            "User-Agent": (
-                "Mozilla/5.0 (compatible; YazoniiOS/1.0; "
-                "+https://github.com/yazoniplay/YazoniiOS)"
-            ),
+            "User-Agent": "YazoniiOS/1.0 public prospect discovery",
             "Accept-Language": "en-US,en;q=0.8",
         }
     )
@@ -55,8 +97,8 @@ def discover(queries, count=20):
     seen = set()
     per_query = max(1, min(int(count), 50))
 
-    for index, query in enumerate(queries):
-        query = str(query).strip()
+    for index, raw_query in enumerate(queries):
+        query = str(raw_query).strip()
         if not query:
             continue
 
@@ -68,56 +110,32 @@ def discover(queries, count=20):
             )
             response.raise_for_status()
         except requests.RequestException as exc:
-            raise DiscoveryError(
-                f"Search failed for '{query}': {exc}"
-            ) from exc
+            raise DiscoveryError(f"Search failed for '{query}': {exc}") from exc
 
         soup = BeautifulSoup(response.text, "html.parser")
-        results = soup.select(".result")
-
-        if not results:
-            results = soup.select("div[data-testid='result']")
-
+        results = soup.select(".result") or soup.select("div[data-testid='result']")
         added = 0
+
         for result in results:
             if added >= per_query:
                 break
-
-            anchor = result.select_one("a.result__a") or result.select_one(
-                "a[data-testid='result-title-a']"
-            )
+            anchor = result.select_one("a.result__a") or result.select_one("a[data-testid='result-title-a']")
             if not anchor:
                 continue
-
             url = _clean_result_url(anchor.get("href"))
             if not url:
                 continue
-
             domain = _host(url)
             if not domain or domain in seen:
                 continue
-
             title = anchor.get_text(" ", strip=True)
-            description_node = result.select_one(".result__snippet") or result.select_one(
-                "[data-result='snippet']"
-            )
-            description = (
-                description_node.get_text(" ", strip=True)
-                if description_node
-                else ""
-            )
-
+            description_node = result.select_one(".result__snippet") or result.select_one("[data-result='snippet']")
+            description = description_node.get_text(" ", strip=True) if description_node else ""
             seen.add(domain)
-            found.append(
-                {
-                    "url": url,
-                    "domain": domain,
-                    "title": title,
-                    "description": description,
-                    "query": query,
-                }
-            )
+            found.append({"url": url, "domain": domain, "title": title, "description": description, "query": query, "source": "web"})
             added += 1
+
+        found.extend(_reddit_candidates(session, query, per_query, seen))
 
         if index < len(queries) - 1:
             time.sleep(1)
