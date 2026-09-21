@@ -18,6 +18,23 @@ BING_RSS_URL = "https://www.bing.com/search"
 REDDIT_SEARCH_URL = "https://www.reddit.com/search.json"
 LOGGER = logging.getLogger(__name__)
 
+# Never treat listing/directory/social platforms as the prospect itself.
+EXCLUDED_PROSPECT_HOSTS = {
+    "yelp.com","yellowpages.com","foursquare.com","tripadvisor.com","mapquest.com",
+    "manta.com","superpages.com","bbb.org","chamberofcommerce.com","alignable.com",
+    "hotfrog.com","merchantcircle.com","brownbook.net","cylex.us.com","citysearch.com",
+    "local.com","porch.com","angi.com","homeadvisor.com","thumbtack.com",
+    "facebook.com","instagram.com","linkedin.com","x.com","twitter.com","tiktok.com",
+    "youtube.com","crunchbase.com","clutch.co","upcity.com","expertise.com",
+    "yellowbook.com","411.com","bizapedia.com","dnb.com","indeed.com","glassdoor.com",
+    "ziprecruiter.com","wikipedia.org","reddit.com","old.reddit.com",
+}
+
+EXCLUDED_PATH_MARKERS = (
+    "/directory/","/directories/","/business-directory/","/businesses/",
+    "/listing/","/listings/","/company-directory/","/local-directory/",
+)
+
 
 def _clean_result_url(href, base_url=DDG_HTML_URL):
     if not href:
@@ -63,6 +80,12 @@ def _parse_search_results(html, base_url, query, source="web", per_query=20):
         url = _clean_result_url(anchor.get("href"), base_url)
         if not url:
             continue
+        host = _host(url)
+        path = urlparse(url).path.lower()
+        if host in EXCLUDED_PROSPECT_HOSTS:
+            continue
+        if any(marker in path for marker in EXCLUDED_PATH_MARKERS):
+            continue
         description_node = result.select_one(".result__snippet") or result.select_one(
             "[data-result='snippet']"
         )
@@ -95,6 +118,12 @@ def _bing_rss_candidates(session, query, per_query):
         description = item.find("description")
         url = _clean_result_url(link.get_text(strip=True) if link else "", BING_RSS_URL)
         if not url:
+            continue
+        host = _host(url)
+        path = urlparse(url).path.lower()
+        if host in EXCLUDED_PROSPECT_HOSTS:
+            continue
+        if any(marker in path for marker in EXCLUDED_PATH_MARKERS):
             continue
         found.append(
             {
