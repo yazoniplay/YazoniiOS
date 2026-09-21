@@ -1,6 +1,6 @@
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from urllib.parse import parse_qs, unquote, urljoin, urlparse
 
 import requests
@@ -36,21 +36,110 @@ def _host(url):
     return host[4:] if host.startswith("www.") else host
 
 
+def _reddit_age_days():
+    return max(1, min(int(os.getenv("REDDIT_MAX_AGE_DAYS", "5")), 7))
+
+
+def _reddit_candidates_from_search(session, query, per_query, seen):
+    """Fallback for environments where Reddit blocks direct API requests."""
+    max_age_days = _reddit_age_days()
+    cutoff_date = (datetime.now(timezone.utc) - timedelta(days=max_age_days)).date()
+    search_query = f"site:reddit.com {query} after:{cutoff_date.isoformat()}"
+
+    response = session.get(
+        SEARCH_URL,
+        params={"q": search_query, "kl": "wt-wt"},
+        timeout=15,
+    )
+    response.raise_for_status()
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    results = soup.select(".result") or soup.select("div[data-testid='result']")
+    found = []
+
+    for result in results:
+        if len(found) >= per_query:
+            break
+
+        anchor = result.select_one("a.result__a") or result.select_one(
+            "a[data-testid='result-title-a']"
+        )
+        if not anchor:
+            continue
+
+        url = _clean_result_url(anchor.get("href"))
+        if not url:
+            continue
+
+        host = _host(url)
+        if host not in {"reddit.com", "old.reddit.com", "www.reddit.com"}:
+            continue
+
+        parsed = urlparse(url)
+        if not parsed.path.startswith(("/r/", "/comments/")):
+            continue
+
+        post_match = parsed.path.split("/comments/")
+        post_id = post_match[1].split("/")[0] if len(post_match) == 2 else parsed.path
+
+        domain = f"reddit:{post_id}"
+        if domain in seen:
+            continue
+
+        description_node = result.select_one(".result__snippet") or result.select_one(
+            "[data-result='snippet']"
+        )
+        description = (
+            description_node.get_text(" ", strip=True)
+            if description_node
+            else ""
+        )
+
+        seen.add(domain)
+        found.append(
+            {
+                "url": url,
+                "domain": domain,
+                "title": anchor.get_text(" ", strip=True) or "Reddit discussion",
+                "description": description[:3000],
+                "query": query,
+                "source": "reddit",
+                "subreddit": "",
+            }
+        )
+
+    return found
+
+
 def _reddit_candidates(session, query, per_query, seen):
+    max_age_days = _reddit_age_days()
+    cutoff = datetime.now(timezone.utc).timestamp() - (max_age_days * 86400)
+
     try:
         response = session.get(
             REDDIT_SEARCH_URL,
-            params={"q": query, "sort": "new", "t": "week", "limit": per_query, "raw_json": 1},
+            params={
+                "q": query,
+                "sort": "new",
+                "t": "week",
+                "limit": per_query,
+                "raw_json": 1,
+            },
             headers={"Accept": "application/json"},
             timeout=15,
         )
         response.raise_for_status()
         payload = response.json()
-    except (requests.RequestException, ValueError) as exc:
-        raise DiscoveryError(f"Reddit search failed for '{query}': {exc}") from exc
+    except (requests.RequestException, ValueError):
+        # GitHub Actions and other cloud IP ranges can be blocked by Reddit.
+        # Fall back to public search-engine results instead of killing the scan.
+        try:
+            return _reddit_candidates_from_search(session, query, per_query, seen)
+        except (requests.RequestException, ValueError) as exc:
+            # Reddit is an enrichment source, so a failure here should not
+            # prevent the main web discovery pipeline from running.
+            return []
 
-    max_age_days = max(1, min(int(os.getenv("REDDIT_MAX_AGE_DAYS", "5")), 7))
-    cutoff = datetime.now(timezone.utc).timestamp() - (max_age_days * 86400)
     found = []
 
     for child in payload.get("data", {}).get("children", []):
@@ -58,6 +147,7 @@ def _reddit_candidates(session, query, per_query, seen):
         created = float(data.get("created_utc") or 0)
         permalink = data.get("permalink")
         post_id = data.get("id")
+
         if not permalink or not post_id or created < cutoff:
             continue
 
@@ -72,7 +162,9 @@ def _reddit_candidates(session, query, per_query, seen):
                 "url": url,
                 "domain": domain,
                 "title": data.get("title") or "Reddit discussion",
-                "description": BeautifulSoup(data.get("selftext") or "", "html.parser").get_text(" ", strip=True)[:3000],
+                "description": BeautifulSoup(
+                    data.get("selftext") or "", "html.parser"
+                ).get_text(" ", strip=True)[:3000],
                 "query": query,
                 "source": "reddit",
                 "subreddit": data.get("subreddit", ""),
@@ -119,20 +211,42 @@ def discover(queries, count=20):
         for result in results:
             if added >= per_query:
                 break
-            anchor = result.select_one("a.result__a") or result.select_one("a[data-testid='result-title-a']")
+
+            anchor = result.select_one("a.result__a") or result.select_one(
+                "a[data-testid='result-title-a']"
+            )
             if not anchor:
                 continue
+
             url = _clean_result_url(anchor.get("href"))
             if not url:
                 continue
+
             domain = _host(url)
             if not domain or domain in seen:
                 continue
+
             title = anchor.get_text(" ", strip=True)
-            description_node = result.select_one(".result__snippet") or result.select_one("[data-result='snippet']")
-            description = description_node.get_text(" ", strip=True) if description_node else ""
+            description_node = result.select_one(".result__snippet") or result.select_one(
+                "[data-result='snippet']"
+            )
+            description = (
+                description_node.get_text(" ", strip=True)
+                if description_node
+                else ""
+            )
+
             seen.add(domain)
-            found.append({"url": url, "domain": domain, "title": title, "description": description, "query": query, "source": "web"})
+            found.append(
+                {
+                    "url": url,
+                    "domain": domain,
+                    "title": title,
+                    "description": description,
+                    "query": query,
+                    "source": "web",
+                }
+            )
             added += 1
 
         found.extend(_reddit_candidates(session, query, per_query, seen))
