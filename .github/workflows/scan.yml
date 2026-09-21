@@ -16,6 +16,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Notify Discord - scan started
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          python - <<'PY'
+          import os
+          import requests
+
+          webhook = os.environ["DISCORD_WEBHOOK_URL"]
+          payload = {
+              "username": "YazoniiOS",
+              "embeds": [{
+                  "title": "🟢 YazoniiOS scan started",
+                  "description": "A new automated prospect scan has started.",
+                  "color": 0x57F287,
+                  "fields": [
+                      {"name": "Status", "value": "Running", "inline": True},
+                      {"name": "Trigger", "value": os.environ.get("GITHUB_EVENT_NAME", "unknown"), "inline": True},
+                  ],
+                  "footer": {"text": "YazoniiOS automated worker"}
+              }]
+          }
+          response = requests.post(webhook, json=payload, timeout=15)
+          response.raise_for_status()
+          PY
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -45,3 +71,30 @@ jobs:
           git add -f yazonii.db
           git diff --cached --quiet || git commit -m "Update prospect database"
           git push
+
+      - name: Notify Discord - scan crashed
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          python - <<'PY'
+          import os
+          import requests
+
+          webhook = os.environ["DISCORD_WEBHOOK_URL"]
+          payload = {
+              "username": "YazoniiOS",
+              "embeds": [{
+                  "title": "🔴 YazoniiOS scan crashed",
+                  "description": "The automated scan failed. Check the GitHub Actions run logs.",
+                  "color": 0xED4245,
+                  "fields": [
+                      {"name": "Status", "value": "Failed", "inline": True},
+                      {"name": "Run", "value": f"https://github.com/{os.environ.get('GITHUB_REPOSITORY')}/actions/runs/{os.environ.get('GITHUB_RUN_ID')}", "inline": False},
+                  ],
+                  "footer": {"text": "YazoniiOS automated worker"}
+              }]
+          }
+          response = requests.post(webhook, json=payload, timeout=15)
+          response.raise_for_status()
+          PY
