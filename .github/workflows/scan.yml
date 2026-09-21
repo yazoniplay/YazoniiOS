@@ -60,7 +60,7 @@ jobs:
           GEMINI_MODEL: gemini-3.5-flash-lite
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DATABASE_PATH: yazonii.db
-          DEFAULT_QUERIES: dental clinic Sweden,restaurant Sweden,construction company Sweden,small business website Sweden,website redesign business Sweden,looking for a web designer
+          DEFAULT_QUERIES: "looking for a web designer,need a website,website redesign help,website developer needed,build me a website,small business website problems,website not mobile friendly,website booking system help,site:reddit.com web design client needed,site:reddit.com website redesign needed"
           MAX_RESULTS_PER_QUERY: "20"
           REDDIT_MAX_AGE_DAYS: "5"
           MAX_CRAWL_PAGES: "12"
