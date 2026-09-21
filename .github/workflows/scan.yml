@@ -60,7 +60,7 @@ jobs:
           GEMINI_MODEL: gemini-3.5-flash-lite
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DATABASE_PATH: yazonii.db
-          DEFAULT_QUERIES: "need a website,looking for a web designer,need a web developer,website redesign needed,build me a website,website development help,website not mobile friendly,website is outdated,need an online store,need a Shopify website,need an ecommerce website,need a landing page,need a portfolio website,need help with online booking,website project budget,hire a website developer"
+          DEFAULT_QUERIES: "need a website,looking for a web designer,need a web developer,website redesign,need a website developer,looking for a website developer,need help with website,need an online store,need a Shopify website,need an ecommerce website,website is outdated,website not mobile friendly,website project"
           MAX_RESULTS_PER_QUERY: "20"
           REDDIT_MAX_AGE_DAYS: "5"
           MAX_CRAWL_PAGES: "12"
