@@ -99,20 +99,20 @@ def _is_relevant(title, body, query=""):
     """
     title_text = (title or "").strip().lower()
     text = f"{title_text} {body or ''}".lower()
-    compact = re.sub(r"\\s+", " ", text)
+    compact = re.sub(r"\s+", " ", text)
 
     # Provider/service-post signals. These are not prospects.
     provider_patterns = (
         r"\\[?for\\s*hire\\]?",
-        r"\\bfor\\s+hire\\b",
-        r"\\bavailable\\s+for\\s+hire\\b",
-        r"\\bi(?:'m|\\s+am)\\s+(?:a\\s+)?(?:freelance|freelancer|web\\s+developer|web\\s+designer)\\b",
-        r"\\b(?:web\\s+developer|web\\s+designer|freelance\\s+developer|freelancer)\\s+available\\b",
-        r"\\bi\\s+(?:will|can|build|make|create|design)\\s+(?:you\\s+)?(?:a\\s+)?(?:website|web\\s+site)\\b",
-        r"\\b(?:offering|offer)\\s+(?:web|website|web\\s+design|web\\s+development)\\b",
-        r"\\bmy\\s+(?:web\\s+)?(?:development|design)\\s+services\\b",
-        r"\\b(?:website|web)\\s+(?:development|design)\\s+services\\b",
-        r"\\b(?:hire|contact|dm)\\s+me\\b.*\\b(?:website|web\\s+(?:developer|designer))\\b",
+        r"\bfor\s+hire\\b",
+        r"\bavailable\s+for\s+hire\\b",
+        r"\bi(?:'m|\s+am)\s+(?:a\s+)?(?:freelance|freelancer|web\s+developer|web\s+designer)\\b",
+        r"\b(?:web\s+developer|web\s+designer|freelance\s+developer|freelancer)\s+available\\b",
+        r"\bi\s+(?:will|can|build|make|create|design)\s+(?:you\s+)?(?:a\s+)?(?:website|web\s+site)\\b",
+        r"\b(?:offering|offer)\s+(?:web|website|web\s+design|web\s+development)\\b",
+        r"\bmy\s+(?:web\s+)?(?:development|design)\s+services\\b",
+        r"\b(?:website|web)\s+(?:development|design)\s+services\\b",
+        r"\b(?:hire|contact|dm)\s+me\\b.*\\b(?:website|web\s+(?:developer|designer))\\b",
     )
     if any(re.search(pattern, compact, re.I | re.S) for pattern in provider_patterns):
         return False
@@ -138,12 +138,12 @@ def _is_relevant(title, body, query=""):
     # A real buyer post needs an explicit buyer/request phrase AND a
     # website-specific object. Generic "hiring" + "website" is too loose.
     buyer_patterns = (
-        r"\\bneed(?:s|ed)?\\b.{0,100}\\b(?:a\\s+)?(?:website|web\\s+site|web\\s+developer|web\\s+designer|wordpress|shopify|online\\s+store|landing\\s+page)\\b",
-        r"\\b(?:website|web\\s+site|wordpress|shopify|online\\s+store|landing\\s+page)\\b.{0,100}\\b(?:need|needs|looking\\s+for|looking\\s+to\\s+hire|hiring|hire|seeking|want|want\\s+to\\s+hire)\\b",
-        r"\\b(?:looking\\s+for|looking\\s+to\\s+hire|seeking|want(?:s)?\\s+to\\s+hire|hiring)\\b.{0,100}\\b(?:web\\s+developer|web\\s+designer|website|web\\s+site|wordpress|shopify|ecommerce|e-commerce|online\\s+store|landing\\s+page)\\b",
-        r"\\b(?:build|create|make|redesign|revamp|rebuild)\\b.{0,100}\\b(?:my|our|a|the)\\s+(?:website|web\\s+site|site|shopify\\s+store|online\\s+store)\\b",
-        r"\\b(?:my|our)\\s+(?:website|web\\s+site|site)\\b.{0,100}\\b(?:outdated|old|broken|terrible|needs?\\s+(?:a\\s+)?(?:redesign|revamp|rebuild|work))\\b",
-        r"\\b(?:need|looking\\s+for|seeking)\\b.{0,100}\\b(?:someone|person|developer|designer|agency)\\b.{0,100}\\b(?:website|web\\s+site|shopify|wordpress|ecommerce)\\b",
+        r"\bneed(?:s|ed)?\\b.{0,100}\\b(?:a\s+)?(?:website|web\s+site|web\s+developer|web\s+designer|wordpress|shopify|online\s+store|landing\s+page)\\b",
+        r"\b(?:website|web\s+site|wordpress|shopify|online\s+store|landing\s+page)\\b.{0,100}\\b(?:need|needs|looking\s+for|looking\s+to\s+hire|hiring|hire|seeking|want|want\s+to\s+hire)\\b",
+        r"\b(?:looking\s+for|looking\s+to\s+hire|seeking|want(?:s)?\s+to\s+hire|hiring)\\b.{0,100}\\b(?:web\s+developer|web\s+designer|website|web\s+site|wordpress|shopify|ecommerce|e-commerce|online\s+store|landing\s+page)\\b",
+        r"\b(?:build|create|make|redesign|revamp|rebuild)\\b.{0,100}\\b(?:my|our|a|the)\s+(?:website|web\s+site|site|shopify\s+store|online\s+store)\\b",
+        r"\b(?:my|our)\s+(?:website|web\s+site|site)\\b.{0,100}\\b(?:outdated|old|broken|terrible|needs?\s+(?:a\s+)?(?:redesign|revamp|rebuild|work))\\b",
+        r"\b(?:need|looking\s+for|seeking)\\b.{0,100}\\b(?:someone|person|developer|designer|agency)\\b.{0,100}\\b(?:website|web\s+site|shopify|wordpress|ecommerce)\\b",
     )
     if not any(re.search(pattern, compact, re.I | re.S) for pattern in buyer_patterns):
         return False
