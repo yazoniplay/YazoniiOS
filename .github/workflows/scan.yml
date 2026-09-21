@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: yazoniiOS-scan
+  cancel-in-progress: false
+
 env:
   PYTHONUNBUFFERED: "1"
 
@@ -18,6 +22,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Notify Discord - scan started
         env:
@@ -71,9 +77,15 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@noreply.github.com"
+
+          # Code changes may have landed while this scan was running.
+          # Rebase the local scan result onto the latest main before committing.
+          git fetch origin main
+          git rebase origin/main
+
           git add -f yazonii.db
           git diff --cached --quiet || git commit -m "Update prospect database"
-          git push
+          git push origin HEAD:main
 
       - name: Notify Discord - scan crashed
         if: failure()
