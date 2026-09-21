@@ -28,13 +28,13 @@ jobs:
       - name: Run automated scan
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.6-flash' }}
+          GEMINI_MODEL: gemini-3.6-flash
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DATABASE_PATH: yazonii.db
-          DEFAULT_QUERIES: ${{ vars.DEFAULT_QUERIES || 'dentist stockholm,restaurant stockholm,construction company stockholm' }}
-          MAX_RESULTS_PER_QUERY: ${{ vars.MAX_RESULTS_PER_QUERY || '20' }}
-          REDDIT_MAX_AGE_DAYS: ${{ vars.REDDIT_MAX_AGE_DAYS || '5' }}
-          MAX_CRAWL_PAGES: ${{ vars.MAX_CRAWL_PAGES || '12' }}
+          DEFAULT_QUERIES: dentist stockholm,restaurant stockholm,construction company stockholm
+          MAX_RESULTS_PER_QUERY: "20"
+          REDDIT_MAX_AGE_DAYS: "5"
+          MAX_CRAWL_PAGES: "12"
           HONOR_ROBOTS: "true"
         run: python run_scan.py
 
