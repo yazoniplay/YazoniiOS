@@ -91,25 +91,65 @@ def _clean_text(value):
 def _is_relevant(title, body, query=""):
     text = f"{title} {body}".lower()
 
+    # Reject service providers and unrelated marketing/social-media offers.
     if any(term in text for term in OFFER_TERMS):
         return False
 
-    if any(term in text for term in INTENT_TERMS):
-        return True
+    unrelated_only = (
+        ("social media" in text or "social-media" in text)
+        and not any(term in text for term in (
+            "website", "web developer", "web designer", "wordpress",
+            "shopify", "ecommerce", "online store", "landing page",
+            "webflow", "frontend", "front-end",
+        ))
+    )
+    if unrelated_only:
+        return False
 
-    website_words = sum(
-        word in text for word in
-        ("website", "web", "shopify", "ecommerce", "wordpress", "online store")
+    # A valid prospect must contain BOTH a website-related signal and
+    # a clear request/hiring signal. Incidental mentions of "website"
+    # are not enough.
+    website_signals = (
+        "website", "web developer", "web designer", "wordpress",
+        "shopify", "ecommerce", "online store", "landing page",
+        "webflow", "frontend", "front-end", "website redesign",
+        "redesign my site", "build a site", "create a site",
     )
-    request_words = sum(
-        word in text for word in
-        ("need", "looking", "help", "want", "hire", "hiring", "build",
-         "create", "redesign", "developer", "designer")
+    request_signals = (
+        "need", "looking for", "looking to hire", "hiring", "hire",
+        "seeking", "want to hire", "need help", "build", "create",
+        "redesign", "developer", "designer", "agency",
     )
+
+    has_website_signal = any(term in text for term in website_signals)
+    has_request_signal = any(term in text for term in request_signals)
+
+    if not (has_website_signal and has_request_signal):
+        return False
+
+    # Require a direct web-development/design intent phrase or a strong
+    # combination of web + hiring/request language.
+    direct_intent = any(term in text for term in INTENT_TERMS)
+    strong_request = (
+        has_website_signal
+        and any(term in text for term in (
+            "need a", "looking for", "looking to hire", "hiring",
+            "seeking", "want a", "want to hire", "need help",
+            "build me", "create me", "redesign",
+        ))
+    )
+
+    if not (direct_intent or strong_request):
+        return False
+
+    # The supplied query must actually match when it is specific.
     query_words = [w for w in re.findall(r"[a-z0-9]+", query.lower()) if len(w) > 2]
-    query_match = sum(word in text for word in query_words) >= min(2, len(query_words))
+    if query_words:
+        query_match = sum(word in text for word in query_words) >= min(2, len(query_words))
+        if not query_match:
+            return False
 
-    return website_words >= 1 and request_words >= 2 and query_match
+    return True
 
 def _reddit_rss_candidates(session, subreddit, per_subreddit, seen, queries):
     # Reddit's JSON endpoint is returning 403 from GitHub Actions runners.
