@@ -36,7 +36,7 @@ jobs:
           REDDIT_MAX_AGE_DAYS: ${{ vars.REDDIT_MAX_AGE_DAYS }}
           MAX_CRAWL_PAGES: ${{ vars.MAX_CRAWL_PAGES }}
           HONOR_ROBOTS: "true"
-        run: python scheduler.py
+        run: python run_scan.py
 
       - name: Persist database
         run: |
