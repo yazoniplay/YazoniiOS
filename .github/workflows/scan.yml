@@ -60,7 +60,7 @@ jobs:
           GEMINI_MODEL: gemini-3.5-flash-lite
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DATABASE_PATH: yazonii.db
-          DEFAULT_QUERIES: "looking for a web designer,need a website,website redesign help,website developer needed,build me a website,small business website problems,website not mobile friendly,website booking system help,site:reddit.com web design client needed,site:reddit.com website redesign needed"
+          DEFAULT_QUERIES: "need a website,looking for a web designer,need a web developer,website redesign needed,build me a website,website development help,website not mobile friendly,website is outdated,need an online store,need a Shopify website,need an ecommerce website,need a landing page,need a portfolio website,need help with online booking,website project budget,hire a website developer"
           MAX_RESULTS_PER_QUERY: "20"
           REDDIT_MAX_AGE_DAYS: "5"
           MAX_CRAWL_PAGES: "12"
@@ -70,7 +70,7 @@ jobs:
       - name: Persist database
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email "41898282+github-actions[bot]@noreply.github.com"
           git add -f yazonii.db
           git diff --cached --quiet || git commit -m "Update prospect database"
           git push
