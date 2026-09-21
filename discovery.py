@@ -89,65 +89,78 @@ def _clean_text(value):
     return BeautifulSoup(value or "", "html.parser").get_text(" ", strip=True)
 
 def _is_relevant(title, body, query=""):
-    text = f"{title} {body}".lower()
+    """
+    Accept only posts that look like a buyer/client asking for website work.
 
-    # Reject service providers and unrelated marketing/social-media offers.
-    if any(term in text for term in OFFER_TERMS):
+    The old filter was too semantic: a post could mention "website" somewhere
+    and "hiring" somewhere else and still pass. This version uses explicit
+    buyer-intent patterns and rejects provider/service posts before anything
+    else.
+    """
+    title_text = (title or "").strip().lower()
+    text = f"{title_text} {body or ''}".lower()
+    compact = re.sub(r"\\s+", " ", text)
+
+    # Provider/service-post signals. These are not prospects.
+    provider_patterns = (
+        r"\\[?for\\s*hire\\]?",
+        r"\\bfor\\s+hire\\b",
+        r"\\bavailable\\s+for\\s+hire\\b",
+        r"\\bi(?:'m|\\s+am)\\s+(?:a\\s+)?(?:freelance|freelancer|web\\s+developer|web\\s+designer)\\b",
+        r"\\b(?:web\\s+developer|web\\s+designer|freelance\\s+developer|freelancer)\\s+available\\b",
+        r"\\bi\\s+(?:will|can|build|make|create|design)\\s+(?:you\\s+)?(?:a\\s+)?(?:website|web\\s+site)\\b",
+        r"\\b(?:offering|offer)\\s+(?:web|website|web\\s+design|web\\s+development)\\b",
+        r"\\bmy\\s+(?:web\\s+)?(?:development|design)\\s+services\\b",
+        r"\\b(?:website|web)\\s+(?:development|design)\\s+services\\b",
+        r"\\b(?:hire|contact|dm)\\s+me\\b.*\\b(?:website|web\\s+(?:developer|designer))\\b",
+    )
+    if any(re.search(pattern, compact, re.I | re.S) for pattern in provider_patterns):
         return False
 
-    unrelated_only = (
-        ("social media" in text or "social-media" in text)
-        and not any(term in text for term in (
-            "website", "web developer", "web designer", "wordpress",
-            "shopify", "ecommerce", "online store", "landing page",
-            "webflow", "frontend", "front-end",
-        ))
+    # Hard reject unrelated service categories unless the same post has a
+    # concrete website build/redesign request.
+    unrelated_terms = (
+        "social media marketing", "social media management", "seo services",
+        "search engine optimization", "google ads", "facebook ads",
+        "paid ads", "content writer", "copywriter", "video editor",
+        "graphic design services", "logo design services",
+        "virtual assistant", "appointment setter", "lead generation service",
     )
-    if unrelated_only:
-        return False
-
-    # A valid prospect must contain BOTH a website-related signal and
-    # a clear request/hiring signal. Incidental mentions of "website"
-    # are not enough.
-    website_signals = (
-        "website", "web developer", "web designer", "wordpress",
-        "shopify", "ecommerce", "online store", "landing page",
-        "webflow", "frontend", "front-end", "website redesign",
-        "redesign my site", "build a site", "create a site",
+    website_terms = (
+        "website", "web site", "web developer", "web designer", "wordpress",
+        "shopify", "woocommerce", "ecommerce", "e-commerce", "online store",
+        "landing page", "webflow", "frontend", "front-end", "website redesign",
     )
-    request_signals = (
-        "need", "looking for", "looking to hire", "hiring", "hire",
-        "seeking", "want to hire", "need help", "build", "create",
-        "redesign", "developer", "designer", "agency",
-    )
-
-    has_website_signal = any(term in text for term in website_signals)
-    has_request_signal = any(term in text for term in request_signals)
-
-    if not (has_website_signal and has_request_signal):
-        return False
-
-    # Require a direct web-development/design intent phrase or a strong
-    # combination of web + hiring/request language.
-    direct_intent = any(term in text for term in INTENT_TERMS)
-    strong_request = (
-        has_website_signal
-        and any(term in text for term in (
-            "need a", "looking for", "looking to hire", "hiring",
-            "seeking", "want a", "want to hire", "need help",
-            "build me", "create me", "redesign",
-        ))
-    )
-
-    if not (direct_intent or strong_request):
-        return False
-
-    # The supplied query must actually match when it is specific.
-    query_words = [w for w in re.findall(r"[a-z0-9]+", query.lower()) if len(w) > 2]
-    if query_words:
-        query_match = sum(word in text for word in query_words) >= min(2, len(query_words))
-        if not query_match:
+    if any(term in compact for term in unrelated_terms):
+        if not any(term in compact for term in website_terms):
             return False
+
+    # A real buyer post needs an explicit buyer/request phrase AND a
+    # website-specific object. Generic "hiring" + "website" is too loose.
+    buyer_patterns = (
+        r"\\bneed(?:s|ed)?\\b.{0,100}\\b(?:a\\s+)?(?:website|web\\s+site|web\\s+developer|web\\s+designer|wordpress|shopify|online\\s+store|landing\\s+page)\\b",
+        r"\\b(?:website|web\\s+site|wordpress|shopify|online\\s+store|landing\\s+page)\\b.{0,100}\\b(?:need|needs|looking\\s+for|looking\\s+to\\s+hire|hiring|hire|seeking|want|want\\s+to\\s+hire)\\b",
+        r"\\b(?:looking\\s+for|looking\\s+to\\s+hire|seeking|want(?:s)?\\s+to\\s+hire|hiring)\\b.{0,100}\\b(?:web\\s+developer|web\\s+designer|website|web\\s+site|wordpress|shopify|ecommerce|e-commerce|online\\s+store|landing\\s+page)\\b",
+        r"\\b(?:build|create|make|redesign|revamp|rebuild)\\b.{0,100}\\b(?:my|our|a|the)\\s+(?:website|web\\s+site|site|shopify\\s+store|online\\s+store)\\b",
+        r"\\b(?:my|our)\\s+(?:website|web\\s+site|site)\\b.{0,100}\\b(?:outdated|old|broken|terrible|needs?\\s+(?:a\\s+)?(?:redesign|revamp|rebuild|work))\\b",
+        r"\\b(?:need|looking\\s+for|seeking)\\b.{0,100}\\b(?:someone|person|developer|designer|agency)\\b.{0,100}\\b(?:website|web\\s+site|shopify|wordpress|ecommerce)\\b",
+    )
+    if not any(re.search(pattern, compact, re.I | re.S) for pattern in buyer_patterns):
+        return False
+
+    # Reject posts whose only "website" mention is an example, portfolio,
+    # link, or discussion topic rather than the thing they want built.
+    if not any(re.search(pattern, compact, re.I | re.S) for pattern in buyer_patterns):
+        return False
+
+    # If a specific discovery query is supplied, require its meaningful
+    # terms to occur in the post. Ignore filler words like "a", "my", "for".
+    query_words = [
+        w for w in re.findall(r"[a-z0-9]+", str(query).lower())
+        if len(w) > 3 and w not in {"need", "looking", "website", "with", "help"}
+    ]
+    if query_words and not any(word in compact for word in query_words):
+        return False
 
     return True
 
