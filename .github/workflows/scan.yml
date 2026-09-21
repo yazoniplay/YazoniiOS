@@ -3,7 +3,8 @@ name: YazoniiOS automated prospect scan
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/10 * * * *"
+    # GitHub's supported minimum scheduled interval is 5 minutes.
+    - cron: "*/5 * * * *"
 
 permissions:
   contents: write
@@ -78,16 +79,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@noreply.github.com"
 
-          # Stage and commit the generated DB before rebasing.
-          # Rebase refuses to run while the working tree has unstaged changes.
           git add -f yazonii.db
           git diff --cached --quiet || git commit -m "Update prospect database"
 
-          # Code changes may have landed while this scan was running.
-          # The DB commit is now clean, so it can safely be rebased onto latest main.
           git fetch origin main
           git rebase origin/main
-
           git push origin HEAD:main
 
       - name: Notify Discord - scan crashed
