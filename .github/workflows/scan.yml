@@ -78,13 +78,16 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@noreply.github.com"
 
+          # Stage and commit the generated DB before rebasing.
+          # Rebase refuses to run while the working tree has unstaged changes.
+          git add -f yazonii.db
+          git diff --cached --quiet || git commit -m "Update prospect database"
+
           # Code changes may have landed while this scan was running.
-          # Rebase the local scan result onto the latest main before committing.
+          # The DB commit is now clean, so it can safely be rebased onto latest main.
           git fetch origin main
           git rebase origin/main
 
-          git add -f yazonii.db
-          git diff --cached --quiet || git commit -m "Update prospect database"
           git push origin HEAD:main
 
       - name: Notify Discord - scan crashed
