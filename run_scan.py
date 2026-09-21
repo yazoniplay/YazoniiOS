@@ -8,9 +8,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 
 
 def main():
-    queries = [item.strip() for item in os.getenv("DEFAULT_QUERIES", "").split(",") if item.strip()]
-    if not queries:
-        raise SystemExit("DEFAULT_QUERIES is empty. Configure repository variable DEFAULT_QUERIES.")
+    raw_queries = os.getenv("DEFAULT_QUERIES", "").strip()
+    if not raw_queries:
+        raw_queries = "dentist stockholm,restaurant stockholm,construction company stockholm"
+    queries = [item.strip() for item in raw_queries.split(",") if item.strip()]
     init_db()
     result = run_scan(queries)
     save_scan(queries, result)
