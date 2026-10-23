@@ -1,30 +1,34 @@
-name: Intentional Failure Test (Tuff Auto-Fix)
+name: Gemini Auto-Fix Regression Test
 
 on:
   workflow_dispatch:
   push:
     paths:
       - ".github/workflows/intentional-failure-test.yml"
+      - "tests/autofix_fixture.py"
+      - "tests/test_autofix_fixture.py"
 
 permissions:
   contents: read
 
 jobs:
-  intentional-failure:
-    name: Simulated application crash
+  regression-test:
+    name: Regression test for calculate_total
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Print diagnostic context
-        run: |
-          echo "TEST ONLY: simulating a deterministic application crash."
-          echo "Expected behavior: this step fails with exit code 1."
-          echo "No production code is changed by this test."
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-      - name: Simulate crash for auto-fix testing
+      - name: Explain the test fixture
         run: |
-          echo "::error title=Intentional test failure::Tuff auto-fix test: simulated crash marker TEST_CRASH_731"
-          echo "Diagnostic: the test harness deliberately exits non-zero."
-          exit 1
+          echo "TEST-ONLY fixture: tests/autofix_fixture.py"
+          echo "Expected behavior: calculate_total([1, 2, 3]) returns 6."
+          echo "The fixture contains a deterministic off-by-one bug."
+
+      - name: Run regression test
+        run: python tests/test_autofix_fixture.py
