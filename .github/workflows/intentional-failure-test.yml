@@ -1,0 +1,30 @@
+name: Intentional Failure Test (Tuff Auto-Fix)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/intentional-failure-test.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  intentional-failure:
+    name: Simulated application crash
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Print diagnostic context
+        run: |
+          echo "TEST ONLY: simulating a deterministic application crash."
+          echo "Expected behavior: this step fails with exit code 1."
+          echo "No production code is changed by this test."
+
+      - name: Simulate crash for auto-fix testing
+        run: |
+          echo "::error title=Intentional test failure::Tuff auto-fix test: simulated crash marker TEST_CRASH_731"
+          echo "Diagnostic: the test harness deliberately exits non-zero."
+          exit 1
