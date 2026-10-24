@@ -27,6 +27,16 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    buildTypes {
+        release {
+            // Creates an installable release-variant APK for device testing.
+            // For future updates and Play Store publishing, replace this with a
+            // persistent private release keystore stored in GitHub Actions secrets.
+            signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = false
+        }
+    }
 }
 
 dependencies {
