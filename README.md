@@ -1,49 +1,36 @@
-# YazoniiOS
+# NourOS
 
-Automated prospect intelligence: discover public business websites, crawl them, analyze observable opportunities with Gemini, score the evidence, store results, and deliver reports to Discord.
+NourOS is an experimental native Android launcher with a futuristic glass interface, subtle cyan accents, a live clock, app search, and an app drawer.
 
-## Features
+## Current scope
 
-- Free public web-search discovery through DuckDuckGo HTML search
-- Domain deduplication and SQLite persistence
-- Public-site crawler with robots.txt support, same-domain limits, timeouts and byte/page caps
-- Extraction of titles, descriptions, text and links
-- Gemini structured analysis with evidence, pain points, opportunities, confidence and score
-- Discord webhook reports
-- Flask dashboard and JSON API
-- Scheduled recurring scans
+- Native Kotlin + Jetpack Compose
+- Android HOME intent so NourOS can be selected as the default launcher
+- Queries installed activities that expose the standard launcher intent
+- Search and launch apps
+- GitHub Actions cloud build that uploads a debug APK
 
-## Setup
+This is a launcher application, not custom Android firmware. Android continues to manage the lock screen, status bar, permissions, and protected system features.
 
-Copy .env.example to .env and add your keys:
+## Build
 
-    GEMINI_API_KEY=
-    DISCORD_WEBHOOK_URL=
+Every push to `main` and manual workflow dispatch runs **NourOS Android Build**. Download the `nouros-debug-apk` artifact from the successful Actions run.
 
-No paid search API key is required.
+The workflow installs JDK 17, Gradle 8.9, Android SDK platform 35, and build tools 35.0.0, then runs `gradle assembleDebug`.
 
-Optional:
+## Install on a Pixel
 
-    GEMINI_MODEL=gemini-3.6-flash
-    DATABASE_PATH=yazonii.db
-    DISCOVERY_INTERVAL_MINUTES=60
-    MAX_RESULTS_PER_QUERY=20
-    MAX_CRAWL_PAGES=12
-    MAX_CRAWL_CONCURRENCY=4
-    CRAWL_TIMEOUT_SECONDS=12
-    CRAWL_MAX_BYTES=1500000
-    HONOR_ROBOTS=true
-    DEFAULT_QUERIES=dentist stockholm,restaurant stockholm,construction company stockholm
+1. Download the artifact ZIP from GitHub Actions and extract `app-debug.apk`.
+2. Open the APK on the Pixel and approve installation if Android asks.
+3. Open Settings and search for **Default apps** or **Home app**.
+4. Select NourOS to try it as the home screen. You can switch back to Pixel Launcher from the same setting.
 
-## Run
+Only install APKs you built or trust. This is a debug build intended for testing, not a production release.
 
-    pip install -r requirements.txt
-    python app.py
+## Development
 
-Open http://localhost:5000.
-
-API:
-
-    curl -X POST http://localhost:5000/api/scans -H "Content-Type: application/json" -d '{"queries":["dentist stockholm","restaurant stockholm"]}'
-
-The crawler is limited to publicly reachable HTTP(S) pages and does not attempt authentication, CAPTCHA bypasses, stealth, or access-control circumvention. Search discovery uses the public DuckDuckGo HTML endpoint rather than a paid search API.
+- Application ID: `com.nour.os`
+- Minimum Android version: Android 8.0 (API 26)
+- Compile/target SDK: 35
+- Kotlin: 2.0.21
+- Android Gradle Plugin: 8.7.3
