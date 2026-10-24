@@ -1,4 +1,4 @@
-name: NourOS Android Build
+name: NourOS Android Release
 
 on:
   push:
@@ -10,9 +10,9 @@ permissions:
 
 jobs:
   build:
-    name: Build debug APK
+    name: Build installable release APK
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -28,19 +28,21 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Install Android SDK packages
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
-      - name: Install Android 35 platform and build tools
+      - name: Install required Android SDK components
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Build APK
-        run: gradle assembleDebug --stacktrace
+      - name: Build release APK
+        run: gradle assembleRelease --stacktrace
 
-      - name: Upload debug APK
+      - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
-          name: nouros-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: nouros-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
