@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -116,7 +117,7 @@ fun NourHomeScreen() {
         Box(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(top = 250.dp, start = (-110).dp)
+                .padding(top = 250.dp).offset(x = (-110).dp)
                 .size(250.dp)
                 .clip(CircleShape)
                 .background(Color(0x222A67FF))
